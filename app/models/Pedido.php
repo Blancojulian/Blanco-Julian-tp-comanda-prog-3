@@ -42,7 +42,7 @@ class Pedido implements JsonSerializable
         $query = 'INSERT INTO pedidos (codigo,nombreCliente,codigoMesa,idEstado,total,cancelado,tiempoEstimado)VALUES(:codigo,:nombreCliente,:codigoMesa,:idEstado,:total,:cancelado,:tiempoEstimado)';
         $consulta = $objetoAccesoDato->RetornarConsulta($query);
         $consulta->bindValue(':codigo', $this->codigo, PDO::PARAM_STR);
-        $consulta->bindValue(':nombreCliente', $this->codigo, PDO::PARAM_STR);
+        $consulta->bindValue(':nombreCliente', $this->nombreCliente, PDO::PARAM_STR);
         $consulta->bindValue(':codigoMesa', $this->codigoMesa, PDO::PARAM_STR);
         $consulta->bindValue(':idEstado', $this->idEstado, PDO::PARAM_INT);
         $consulta->bindValue(':total', $this->total, PDO::PARAM_STR);//float

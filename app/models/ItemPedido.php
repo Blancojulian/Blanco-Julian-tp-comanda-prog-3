@@ -82,12 +82,12 @@ class ItemPedido implements JsonSerializable
         $producto = null;
 
         foreach ($data as $i) {
-            $producto = Producto::GetProductoPorNombre($i['producto']);
+            $producto = Producto::GetProducto($i['id']);
             if (!isset($producto)) {
-                throw new Exception("No existe producto ". $i['producto']);
+                throw new Exception("No existe producto id ". $i['producto']);
                 
             }
-            $item = new ItemPedido($i['idPedido'], $producto->id, $producto->nombre, $i['cantidad'], floatval($i['precioUnitario']));
+            $item = new ItemPedido($i['id'], $producto->id, $producto->nombre, $i['cantidad'], floatval($i['precioUnitario']));
             array_push($items, $item);
         }
         return $items;

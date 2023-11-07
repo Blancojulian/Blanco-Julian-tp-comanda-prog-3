@@ -2,6 +2,7 @@
 
 require_once './models/Pedido.php';
 require_once './models/EstadoPedido.php';
+require_once './models/Mesa.php';
 require_once './utils/utils.php';
 require_once './interfaces/IController.php';
 
@@ -51,21 +52,45 @@ class PedidoController implements IController {
         return $res;
     }
     //ver
+    //el estado inicial va ser pendiente
     public function Create(Request $req, Response $res, array $args = []) {//ver si no habria que pedir el estado, si es una mesa nueva no deberia estar cerrada
         $parametros = $req->getParsedBody();
         $codigo = generarCodigo(5);
-
-        if (!isset($parametros['idEstado'])) {
-            throw new HttpBadRequestException($req);
+        //var_dump($parametros);
+        if (!isset($parametros['nombreCliente']) || !isset($parametros['codigoMesa']) ||
+        !isset($parametros['items'])) {
+            throw new HttpBadRequestException($req, 'Debe enviar nombre del cliente, codigo mesa y los items');
         }
-        $estado = EstadoMesa::GetEstadoPorId($parametros['idEstado']);
+        //parsear el array a un array de ItemPedido
+        $itemsParseados = ItemPedido::ConvertirAArrayItems($parametros['items']);
+
+        //validar estado del pedido
+        $estadoPendiente = 1;// estado inicial pendiente
+        $estado = EstadoPedido::GetEstadoPorId($estadoPendiente);
         if (!isset($estado)) {
             throw new HttpBadRequestException($req); 
         }
 
-        $mesa = new Mesa($codigo, $estado->id, $estado->estado);
-        $id = $mesa->CrearMesa();
-        $res->getBody()->write(json_encode(['mensaje' => "Mesa creada", 'id' => $id, 'codigo' => $codigo]));
+        //validar que mesa este libre
+        $estadoMesaLibre = 5;
+        $mesaClienteEsperando = 1;
+        $mesa = Mesa::GetMesaPorCodigo($parametros['codigoMesa']);
+        if (!isset($mesa)) {
+            throw new HttpBadRequestException($req, 'Mesa codigo '.$parametros['codigoMesa'].' no existe'); 
+        }
+        if ( $mesa->idEstado !== $estadoMesaLibre ) {
+            throw new HttpBadRequestException($req, 'La mesa esta ocupada'); 
+        }
+        $pedido = new Pedido($codigo, $parametros['nombreCliente'],
+        $parametros['codigoMesa'], $estado->id, $estado->estado);
+
+        $pedido->items = $itemsParseados;
+        $pedido->CalcularTotal();
+        $id = $pedido->CrearPedido();
+        //cambiar mesa a cliente esperando
+        $mesa->idEstado = $mesaClienteEsperando;
+        $mesa->ModificarMesa();
+        $res->getBody()->write(json_encode(['mensaje' => "Pedido creado", 'id' => $id, 'codigo' => $codigo]));
 
         return $res;
     }
