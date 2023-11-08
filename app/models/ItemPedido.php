@@ -36,8 +36,6 @@ class ItemPedido implements JsonSerializable
 
     public static function CrearItems($idPedido, array $items)
     {
-        echo 'hola';
-
         $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
         $query = 'INSERT INTO itemsPedido (idPedido,idProducto,cantidad,precioUnitario) VALUES (:idPedido,:idProducto,:cantidad,:precioUnitario)';
         $consulta = $objetoAccesoDato->RetornarConsulta($query);
@@ -90,7 +88,7 @@ class ItemPedido implements JsonSerializable
                 throw new Exception("No existe producto id ". $i['producto']);
                 
             }
-            $item = new ItemPedido($producto->id, $producto->nombre, $i['cantidad'], floatval($i['precioUnitario']));
+            $item = new ItemPedido($producto->id, $producto->nombre, $i['cantidad'], $producto->precio);
             array_push($items, $item);
         }
         return $items;

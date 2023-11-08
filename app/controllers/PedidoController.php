@@ -73,7 +73,7 @@ class PedidoController implements IController {
 //echo 'hola';
         //validar que mesa este libre
         $estadoMesaLibre = 5;
-        $mesaClienteEsperando = 1;
+        $estadoMesaClienteEsperando = 1;
         $mesa = Mesa::GetMesaPorCodigo($parametros['codigoMesa']);
         if (!isset($mesa)) {
             throw new HttpNotFoundException($req, 'Mesa codigo '.$parametros['codigoMesa'].' no existe'); 
@@ -91,7 +91,7 @@ class PedidoController implements IController {
         ItemPedido::CrearItems($id, $pedido->items);//hacer if para comprobar si falla
         
         //cambiar mesa a cliente esperando
-        $mesa->idEstado = $mesaClienteEsperando;
+        $mesa->idEstado = $estadoMesaClienteEsperando;
         $mesa->ModificarMesa();
         $res->getBody()->write(json_encode(['mensaje' => "Pedido creado", 'id' => $id, 'codigo' => $codigo]));
 
