@@ -92,12 +92,12 @@ $app->group('/producto', function (RouteCollectorProxy $group) {
     $group->get('/', \ProductoController::class . ':GetAll');
     $group->get('/{id}', \ProductoController::class . ':Get');
     $group->delete('/{id}', \ProductoController::class . ':Delete');
-    $group->post('/', \ProductoController::class . ':Create');
+    $group->post('/', \ProductoController::class . ':Create');//agregar tiempo estimado
     $group->put('/', \ProductoController::class . ':Update');
 
 });
 
-$app->group('/pedido', function (RouteCollectorProxy $group) {
+$app->group('/pedido', function (RouteCollectorProxy $group) {//sacar campo precio unitario
     
     $group->get('/', \PedidoController::class . ':GetAll');
     $group->get('/{id}', \PedidoController::class . ':Get');

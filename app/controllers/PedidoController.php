@@ -25,7 +25,7 @@ class PedidoController implements IController {
         }
         $pedido = Pedido::GetPedido($id);
         if (!isset($pedido)) {
-            throw new HttpBadRequestException($req, 'Pedido no existe');   
+            throw new HttpNotFoundException($req, 'Pedido no existe');   
         }
         $res->getBody()->write(json_encode($pedido));
         return $res; 
@@ -70,13 +70,13 @@ class PedidoController implements IController {
         if (!isset($estado)) {
             throw new HttpBadRequestException($req); 
         }
-
+//echo 'hola';
         //validar que mesa este libre
         $estadoMesaLibre = 5;
         $mesaClienteEsperando = 1;
         $mesa = Mesa::GetMesaPorCodigo($parametros['codigoMesa']);
         if (!isset($mesa)) {
-            throw new HttpBadRequestException($req, 'Mesa codigo '.$parametros['codigoMesa'].' no existe'); 
+            throw new HttpNotFoundException($req, 'Mesa codigo '.$parametros['codigoMesa'].' no existe'); 
         }
         if ( $mesa->idEstado !== $estadoMesaLibre ) {
             throw new HttpBadRequestException($req, 'La mesa esta ocupada'); 
@@ -87,6 +87,9 @@ class PedidoController implements IController {
         $pedido->items = $itemsParseados;
         $pedido->CalcularTotal();
         $id = $pedido->CrearPedido();
+
+        ItemPedido::CrearItems($id, $pedido->items);//hacer if para comprobar si falla
+        
         //cambiar mesa a cliente esperando
         $mesa->idEstado = $mesaClienteEsperando;
         $mesa->ModificarMesa();
@@ -105,7 +108,7 @@ class PedidoController implements IController {
         }
         $pedido = Pedido::GetPedido($id);
         if (!isset($pedido)) {
-            throw new HttpBadRequestException($req, 'Mesa no existe');   
+            throw new HttpNotFoundException($req, 'Pedido no existe');   
         }
         $pedido->cancelado = true;
         $pedido->ModificarPedido();
@@ -116,27 +119,58 @@ class PedidoController implements IController {
     public function Update(Request $req, Response $res, array $args = []) {
         $parametros = $req->getParsedBody();
         //$codigo = generarCodigo(5);
-
-        if (!isset($parametros['id']) || !isset($parametros['idEstado'])) {
-            throw new HttpBadRequestException($req);
+        //var_dump($parametros);
+        if ( !!isset($parametros['id']) || !isset($parametros['nombreCliente']) || !isset($parametros['codigoMesa']) ||
+        !!isset($parametros['idEstado']) || !isset($parametros['items'])) {
+            throw new HttpBadRequestException($req, 'Debe enviar id, nombre del cliente, codigo mesa y los items');
         }
-        $estado = EstadoMesa::GetEstadoPorId($parametros['idEstado']);
+        //parsear el array a un array de ItemPedido
+        $itemsParseados = ItemPedido::ConvertirAArrayItems($parametros['items']);
+
+        //validar estado del pedido
+        $estado = EstadoPedido::GetEstadoPorId($parametros['idEstado']);
         if (!isset($estado)) {
-            throw new HttpBadRequestException($req); 
+            throw new HttpBadRequestException($req, 'Estado pedido invalido'); 
         }
 
-        $mesa = Mesa::GetMesa(intval($parametros['id']));
-        
+        //validar que mesa este libre
+        $estadoMesaLibre = 5;
+        $mesaClienteEsperando = 1;
+        $mesa = Mesa::GetMesaPorCodigo($parametros['codigoMesa']);
         if (!isset($mesa)) {
-            throw new HttpBadRequestException($req, 'Mesa no existe');   
+            throw new HttpBadRequestException($req, 'Mesa codigo '.$parametros['codigoMesa'].' no existe'); 
         }
-        
-        $mesa->idEstado = $estado->id;
-        $mesa->estado = $estado->estado;
-        
-        $mesa->ModificarMesa();
+        /*
+        if ( $mesa->idEstado !== $estadoMesaLibre ) {
+            throw new HttpBadRequestException($req, 'La mesa esta ocupada'); 
+        }*/
 
-        $res->getBody()->write(json_encode(['mensaje' => "Mesa modificada"]));
+        $pedido = Pedido::GetPedido(intval($parametros['id']));
+        if (isset($pedido)) {
+            throw new Exception("Error Processing Request", 1);
+            
+        }
+        $pedido->nombreCliente = $parametros['nombreCliente'];
+        $pedido->codigoMesa = $parametros['codigoMesa'];
+        $pedido->idEstado = $estado->id;
+        $pedido->estado = $estado->estado;
+        $pedido->items = $itemsParseados;
+        $pedido->CalcularTotal();
+
+        $pedido->ModificarPedido();
+        ItemPedido::EliminarItems($pedido->id);
+        ItemPedido::CrearItems($pedido->id, $pedido->items);
+
+        $pedido = new Pedido($codigo, $parametros['nombreCliente'],
+        $parametros['codigoMesa'], $estado->id, $estado->estado);
+
+        $pedido->items = $itemsParseados;
+        $pedido->CalcularTotal();
+        $id = $pedido->CrearPedido();
+        //cambiar mesa a cliente esperando
+        $mesa->idEstado = $mesaClienteEsperando;
+        $mesa->ModificarMesa();
+        $res->getBody()->write(json_encode(['mensaje' => "Pedido creado", 'id' => $id, 'codigo' => $codigo]));
 
         return $res;
     }

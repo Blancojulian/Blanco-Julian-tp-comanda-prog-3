@@ -5,14 +5,13 @@ require_once './utils/utils.php';
 
 class ItemPedido implements JsonSerializable
 {
-    public $idPedido;
     public $idProducto;
     public $producto;
     public $cantidad;
     public $precioUnitario;
     
-    public function __construct($idPedido, $idProducto, $producto, $cantidad, $precioUnitario) {
-        $this->idPedido = $idPedido;
+    public function __construct($idProducto, $producto, $cantidad, $precioUnitario) {
+        
         $this->idProducto = $idProducto;
         $this->producto = $producto;
         $this->cantidad = $cantidad;
@@ -23,32 +22,36 @@ class ItemPedido implements JsonSerializable
     
     //no se va a usar siempre se va insertar un array de pedidos y para modificar se eliminan los anteriores y agregan los nuevos
     //por ahora
-    public static function CrearItem(ItemPedido $item)
+    public static function CrearItem($idPedido, ItemPedido $item)
     {
         $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
         $query = 'INSERT INTO itemsPedido (idPedido,idProducto,cantidad,precioUnitario)VALUES(:idPedido,:idProducto,:cantidad,:precioUnitario)';
         $consulta = $objetoAccesoDato->RetornarConsulta($query);
-        $consulta->bindValue(':idPedido', $item->idPedido, PDO::PARAM_INT);
+        $consulta->bindValue(':idPedido', $idPedido, PDO::PARAM_INT);
         $consulta->bindValue(':idProducto', $item->idProducto, PDO::PARAM_INT);
         $consulta->bindValue(':cantidad', $item->cantidad, PDO::PARAM_INT);
         $consulta->bindValue(':precioUnitario', $item->precioUnitario, PDO::PARAM_STR);//ver sino tirar error pq es float
         return $consulta->execute();
     }
 
-    public static function CrearItems(array $items)
+    public static function CrearItems($idPedido, array $items)
     {
+        echo 'hola';
+
         $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
         $query = 'INSERT INTO itemsPedido (idPedido,idProducto,cantidad,precioUnitario) VALUES (:idPedido,:idProducto,:cantidad,:precioUnitario)';
         $consulta = $objetoAccesoDato->RetornarConsulta($query);
-        $objetoAccesoDato->beginTransaction();
+        echo 'hola';
+        var_dump($items);
+        //$objetoAccesoDato->beginTransaction();
         foreach ($items as $item) {
-            $consulta->bindValue(':idPedido', $item->idPedido, PDO::PARAM_INT);
+            $consulta->bindValue(':idPedido', $idPedido, PDO::PARAM_INT);
             $consulta->bindValue(':idProducto', $item->idProducto, PDO::PARAM_INT);
             $consulta->bindValue(':cantidad', $item->cantidad, PDO::PARAM_INT);
             $consulta->bindValue(':precioUnitario', $item->precioUnitario, PDO::PARAM_STR);//ver sino tirar error pq es float
             $consulta->execute();
         }
-        return $objetoAccesoDato->commit();
+        //return $objetoAccesoDato->commit();
         //return $objetoAccesoDato->RetornarUltimoIdInsertado();
     }
 
@@ -70,7 +73,7 @@ class ItemPedido implements JsonSerializable
         $item = null;
         $items = [];
         while ($fila = $consulta->fetch(PDO::FETCH_BOUND)) {
-            $item = new ItemPedido($idPedido, $idProducto, $producto, $cantidad, floatval($precioUnitario));
+            $item = new ItemPedido($idProducto, $producto, $cantidad, floatval($precioUnitario));
             array_push($items, $item);
         }
         return $items;
@@ -87,7 +90,7 @@ class ItemPedido implements JsonSerializable
                 throw new Exception("No existe producto id ". $i['producto']);
                 
             }
-            $item = new ItemPedido($i['id'], $producto->id, $producto->nombre, $i['cantidad'], floatval($i['precioUnitario']));
+            $item = new ItemPedido($producto->id, $producto->nombre, $i['cantidad'], floatval($i['precioUnitario']));
             array_push($items, $item);
         }
         return $items;
@@ -105,6 +108,7 @@ class ItemPedido implements JsonSerializable
     
     public function jsonSerialize(){
         return [
+            'idProducto' => $this->idProducto,
             'producto' => $this->producto,
             'cantidad' => $this->cantidad,
             'precioUnitario' => $this->precioUnitario
