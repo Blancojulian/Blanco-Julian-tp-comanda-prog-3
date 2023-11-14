@@ -4,6 +4,7 @@ require_once './models/Pedido.php';
 require_once './models/EstadoPedido.php';
 require_once './models/Mesa.php';
 require_once './utils/utils.php';
+require_once './utils/Session.php';
 require_once './interfaces/IController.php';
 
 use Psr\Http\Message\ServerRequestInterface as Request;
@@ -32,8 +33,30 @@ class PedidoController implements IController {
     }
 
     public function GetAll(Request $req, Response $res, array $args = []) {
-        $pedidos = Pedido::GetPedidos();
-        $res->getBody()->write(json_encode($pedidos));
+        
+        $rol = Session::GetRol();
+        $pedidos = null;
+        
+        if ($rol === 2 || $rol === 3 || $rol === 4) {
+            $estadoPendiente = 1;
+            $pedidos = Pedido::GetPedidosPorIdEstado($estadoPendiente);
+            if ($rol === 4) {//cocinero
+                $tipoComida = 2;
+                $pedidos = Pedido::GetPedidosPorTipoProducto($tipoComida, $estadoPendiente);
+            } else {//bartender cervecero
+                $tipoBebida = 1;
+                $pedidos = Pedido::GetPedidosPorTipoProducto($tipoBebida, $estadoPendiente);
+
+            }
+        } else {
+            $pedidos = Pedido::GetPedidos();
+        }
+
+        $payload = json_encode(array("pedidos" => $pedidos));
+        //var_dump($req->getParsedBody());
+        //$res->getBody()->write(json_encode($pedidos));
+        $res->getBody()->write($payload);
+
         return $res; 
     }
 
@@ -70,7 +93,7 @@ class PedidoController implements IController {
         if (!isset($estado)) {
             throw new HttpBadRequestException($req); 
         }
-//echo 'hola';
+
         //validar que mesa este libre
         $estadoMesaLibre = 5;
         $estadoMesaClienteEsperando = 1;
@@ -83,7 +106,8 @@ class PedidoController implements IController {
         }
         $pedido = new Pedido($codigo, $parametros['nombreCliente'],
         $parametros['codigoMesa'], $estado->id, $estado->estado);
-
+        echo 'tienmpo estimado';
+        echo json_encode(['tiempo_estimado' => $pedido->tiempoEstimado]);
         $pedido->items = $itemsParseados;
         $pedido->CalcularTotal();
         $id = $pedido->CrearPedido();

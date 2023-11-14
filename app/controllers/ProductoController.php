@@ -56,7 +56,8 @@ class ProductoController implements IController {
         $codigo = generarCodigo(5);
 
         if (!isset($parametros['nombre']) || !isset($parametros['precio']) ||
-        !isset($parametros['stock']) || !isset($parametros['tipoProducto'])) {
+        !isset($parametros['stock']) || !isset($parametros['tipoProducto'])
+        || !isset($parametros['minutosPreparacion'])) {
             throw new HttpBadRequestException($req, 'Debe enviar nombre, precio, stock y tipo de producto');
         }
         $tipoProducto = TipoProducto::GetTipoPorNombre($parametros['tipoProducto']);
@@ -65,7 +66,7 @@ class ProductoController implements IController {
             
         }
 
-        if (!is_numeric($parametros['precio']) || !is_numeric($parametros['stock'])) {
+        if (!is_numeric($parametros['precio']) || !is_numeric($parametros['stock']) || !is_numeric($parametros['minutosPreparacion'])) {
             throw new HttpBadRequestException($req, 'Precio y sotck debe ser numeros');
         }
 
@@ -99,7 +100,8 @@ class ProductoController implements IController {
         $parametros = $req->getParsedBody();
 
         if (!isset($parametros['id']) || !isset($parametros['nombre']) || !isset($parametros['precio']) ||
-        !isset($parametros['stock']) || !isset($parametros['tipoProducto'])) {
+        !isset($parametros['stock']) || !isset($parametros['tipoProducto'])
+        || !isset($parametros['minutosPreparacion'])) {
             throw new HttpBadRequestException($req, 'Debe enviar id, nombre, precio, stock y tipo de producto');
         }
         $tipoProducto = TipoProducto::GetTipoPorNombre($parametros['tipoProducto']);
@@ -108,7 +110,7 @@ class ProductoController implements IController {
             
         }
 
-        if (!is_numeric($parametros['precio']) || !is_numeric($parametros['stock'])) {
+        if (!is_numeric($parametros['precio']) || !is_numeric($parametros['stock']) || !is_numeric($parametros['minutosPreparacion'])) {
             throw new HttpBadRequestException($req, 'Precio y stock deben ser numeros');
         }
 
@@ -122,7 +124,8 @@ class ProductoController implements IController {
         $producto->stock = intval($parametros['stock']);
         $producto->idTipoProducto = $tipoProducto->id;
         $producto->tipoProducto = $tipoProducto->nombre;
-        
+        $producto->minutosPreparacion = intval($parametros['minutosPreparacion']);
+
         $producto->ModificarProducto();
 
         $res->getBody()->write(json_encode(['mensaje' => "Producto modificado"]));

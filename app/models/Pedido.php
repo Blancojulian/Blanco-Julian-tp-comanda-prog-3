@@ -49,6 +49,7 @@ class Pedido implements JsonSerializable
         $consulta->bindValue(':cancelado', $this->cancelado, PDO::PARAM_BOOL);
 
         if (isset($this->tiempoEstimado)) {
+            echo 'en crear pedio'. $this->tiempoEstimado->format("Y-m-d H:i:s");
             $consulta->bindValue(':tiempoEstimado', $this->tiempoEstimado->format("Y-m-d H:i:s"), PDO::PARAM_STR);
         } else {
             $consulta->bindValue(':tiempoEstimado', $this->tiempoEstimado, PDO::PARAM_STR);
@@ -100,7 +101,8 @@ class Pedido implements JsonSerializable
         $pedido = null;
         $pedidos = [];
         while ($fila = $consulta->fetch(PDO::FETCH_BOUND)) {
-            $pedido = new Pedido($codigo, $nombreCliente, $codigoMesa, $idEstado, $estado, floatval($total), new DateTime($tiempoEstimado), $cancelado, $id);
+            $tiempoEstimado = isset($tiempoEstimado) ? new DateTime($tiempoEstimado) : $tiempoEstimado;
+            $pedido = new Pedido($codigo, $nombreCliente, $codigoMesa, $idEstado, $estado, floatval($total), $tiempoEstimado, $cancelado, $id);
             array_push($pedidos, $pedido);
         }
 
@@ -132,7 +134,8 @@ class Pedido implements JsonSerializable
         $pedido = null;
 
         if ($consulta->fetch(PDO::FETCH_BOUND)) {
-            $pedido = new Pedido($codigo, $nombreCliente, $codigoMesa, $idEstado, $estado, floatval($total), new DateTime($tiempoEstimado), $cancelado, $id);
+            $tiempoEstimado = isset($tiempoEstimado) ? new DateTime($tiempoEstimado) : $tiempoEstimado;
+            $pedido = new Pedido($codigo, $nombreCliente, $codigoMesa, $idEstado, $estado, floatval($total), $tiempoEstimado, $cancelado, $id);
             $pedido->items = ItemPedido::GetItems($pedido->id);
         }
         
@@ -160,7 +163,8 @@ class Pedido implements JsonSerializable
         $pedido = null;
         $pedidos = [];
         while ($fila = $consulta->fetch(PDO::FETCH_BOUND)) {
-            $pedido = new Pedido($codigo, $nombreCliente, $codigoMesa, $idEstado, $estado, floatval($total), new DateTime($tiempoEstimado), $cancelado, $id);
+            $tiempoEstimado = isset($tiempoEstimado) ? new DateTime($tiempoEstimado) : $tiempoEstimado;
+            $pedido = new Pedido($codigo, $nombreCliente, $codigoMesa, $idEstado, $estado, floatval($total), $tiempoEstimado, $cancelado, $id);
             array_push($pedidos, $pedido);
         }
 
@@ -168,6 +172,45 @@ class Pedido implements JsonSerializable
             $p->items = ItemPedido::GetItems($p->id);
         }
         return $pedidos;
+    }
+    private static function bindColumnPedidos($consulta) {
+       
+        $consulta->bindColumn('id', $id, PDO::PARAM_INT);
+        $consulta->bindColumn('codigo', $codigo, PDO::PARAM_STR);
+        $consulta->bindColumn('nombreCliente', $nombreCliente, PDO::PARAM_STR);
+        $consulta->bindColumn('codigoMesa', $codigoMesa, PDO::PARAM_STR);
+        $consulta->bindColumn('idEstado', $idEstado, PDO::PARAM_INT);
+        $consulta->bindColumn('estado', $estado, PDO::PARAM_STR);
+        $consulta->bindColumn('total', $total, PDO::PARAM_STR);//float
+        $consulta->bindColumn('cancelado', $cancelado, PDO::PARAM_BOOL);
+        $consulta->bindColumn('tiempoEstimado', $tiempoEstimado, PDO::PARAM_STR);
+
+        $pedido = null;
+        $pedidos = [];
+        while ($fila = $consulta->fetch(PDO::FETCH_BOUND)) {
+            $tiempoEstimado = isset($tiempoEstimado) ? new DateTime($tiempoEstimado) : $tiempoEstimado;
+            $pedido = new Pedido($codigo, $nombreCliente, $codigoMesa, $idEstado, $estado, floatval($total), $tiempoEstimado, $cancelado, $id);
+            array_push($pedidos, $pedido);
+        }
+
+        foreach ($pedidos as $p) {
+            $p->items = ItemPedido::GetItems($p->id);
+        }
+        return $pedidos;
+    }
+
+    public static function GetPedidosPorTipoProducto($idTipoProducto, $idEstadoPedido)
+    {
+        $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
+        $query = 'SELECT p.*, e.estado FROM pedidos p LEFT JOIN estadosPedido e ON p.idEstado = e.id 
+        LEFT JOIN itemsPedido i ON i.idPedido = p.id LEFT JOIN productos pro ON i.idProducto = pro.id 
+        WHERE p.cancelado = 0 AND pro.idTipoProducto = :idTipoProducto AND p.idEstado = :idEstadoPedido';
+        $consulta = $objetoAccesoDato->RetornarConsulta($query);
+        $consulta->bindValue(':idTipoProducto', $idTipoProducto, PDO::PARAM_INT);
+        $consulta->bindValue(':idEstadoPedido', $idEstadoPedido, PDO::PARAM_INT);
+        $consulta->execute();
+
+        return self::bindColumnPedidos($consulta);
     }
 
     public function jsonSerialize(){

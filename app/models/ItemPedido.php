@@ -39,8 +39,8 @@ class ItemPedido implements JsonSerializable
         $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
         $query = 'INSERT INTO itemsPedido (idPedido,idProducto,cantidad,precioUnitario) VALUES (:idPedido,:idProducto,:cantidad,:precioUnitario)';
         $consulta = $objetoAccesoDato->RetornarConsulta($query);
-        echo 'hola';
-        var_dump($items);
+        //echo 'hola';
+        //var_dump($items);
         //$objetoAccesoDato->beginTransaction();
         foreach ($items as $item) {
             $consulta->bindValue(':idPedido', $idPedido, PDO::PARAM_INT);
