@@ -63,6 +63,58 @@ class Puesto {
         
         return $puesto;
     }
+//probar
+    public static function GetPuestos2(...$arrRoles) {
+        $roles = join(",", array_map(fn($r) => "'$r'", $arrRoles));
+        $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
+        $query = 'SELECT id, nombre, permisos FROM puestos WHERE nombre IN (:roles)';
+        $consulta = $objetoAccesoDato->RetornarConsulta($query);
+        $consulta->bindValue(':roles', $roles, PDO::PARAM_STR);
+        $consulta->execute();
+        
+        $consulta->bindColumn('id', $id, PDO::PARAM_INT);
+        $consulta->bindColumn('nombre', $nombre, PDO::PARAM_STR);
+        $consulta->bindColumn('permisos', $permisos, PDO::PARAM_BOOL);
+        $puestos = [];
+        $puesto = null;
+
+        while ($data = $consulta->fetch(PDO::FETCH_BOUND)) {
+            $puesto = new Puesto($nombre, $permisos, $id);
+            array_push($puestos, $puesto);
+        }
+        
+        return $puesto;
+    }
+
+    public static function GetPuestos(...$arrRoles) {
+        
+        $str = str_repeat("?,", count($arrRoles));
+        $str = substr($str, 0, -1);
+        
+        $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
+        $query = "SELECT id, nombre, permisos FROM puestos WHERE nombre IN ($str)";
+        $consulta = $objetoAccesoDato->RetornarConsulta($query);
+        $i = 0;
+        foreach ($arrRoles as $rol) {
+            $i++;
+            $consulta->bindValue($i, $rol, PDO::PARAM_STR);
+
+        }
+        $consulta->execute();
+        
+        $consulta->bindColumn('id', $id, PDO::PARAM_INT);
+        $consulta->bindColumn('nombre', $nombre, PDO::PARAM_STR);
+        $consulta->bindColumn('permisos', $permisos, PDO::PARAM_BOOL);
+        $puestos = [];
+        $puesto = null;
+
+        while ($data = $consulta->fetch(PDO::FETCH_BOUND)) {
+            $puesto = new Puesto($nombre, $permisos, $id);
+            array_push($puestos, $puesto);
+        }
+        
+        return $puesto;
+    }
 }
 
 ?>

@@ -34,27 +34,44 @@ class PedidoController implements IController {
 
     public function GetAll(Request $req, Response $res, array $args = []) {
         
-        $rol = Session::GetRol();
-        $pedidos = null;
-        
-        if ($rol === 2 || $rol === 3 || $rol === 4) {
-            $estadoPendiente = 1;
-            $pedidos = Pedido::GetPedidosPorIdEstado($estadoPendiente);
-            if ($rol === 4) {//cocinero
-                $tipoComida = 2;
-                $pedidos = Pedido::GetPedidosPorTipoProducto($tipoComida, $estadoPendiente);
-            } else {//bartender cervecero
-                $tipoBebida = 1;
-                $pedidos = Pedido::GetPedidosPorTipoProducto($tipoBebida, $estadoPendiente);
-
-            }
-        } else {
-            $pedidos = Pedido::GetPedidos();
-        }
-
+        $pedidos = Pedido::GetPedidos();
         $payload = json_encode(array("pedidos" => $pedidos));
         //var_dump($req->getParsedBody());
         //$res->getBody()->write(json_encode($pedidos));
+        $res->getBody()->write($payload);
+
+        return $res; 
+    }
+
+    public function GetBebidasPendientes(Request $req, Response $res, array $args = []) {
+        echo $_ENV['CLAVE'];
+        echo 'hola';
+        $idTipoBebida = 1;
+        $idEstadoPendiente = 1;
+        $pedidos = Pedido::GetPedidosPorTipoProducto($idTipoBebida, $idEstadoPendiente);
+        $payload = json_encode(["pedidos" => $pedidos]);
+        $res->getBody()->write($payload);
+
+        return $res; 
+    }
+
+    public function GetComidasPendientes(Request $req, Response $res, array $args = []) {
+        
+        $idTipoComida = 2;
+        $idEstadoPendiente = 1;
+        $pedidos = Pedido::GetPedidosPorTipoProducto($idTipoComida, $idEstadoPendiente);
+        $payload = json_encode(["pedidos" => $pedidos]);
+        $res->getBody()->write($payload);
+
+        return $res; 
+    }
+
+    public function GetCervezasPendientes(Request $req, Response $res, array $args = []) {
+        
+        $idTipoCerveza = 3;
+        $idEstadoPendiente = 1;
+        $pedidos = Pedido::GetPedidosPorTipoProducto($idTipoCerveza, $idEstadoPendiente);
+        $payload = json_encode(["pedidos" => $pedidos]);
         $res->getBody()->write($payload);
 
         return $res; 
@@ -79,11 +96,6 @@ class PedidoController implements IController {
     public function Create(Request $req, Response $res, array $args = []) {//ver si no habria que pedir el estado, si es una mesa nueva no deberia estar cerrada
         $parametros = $req->getParsedBody();
         $codigo = generarCodigo(5);
-        //var_dump($parametros);
-        if (!isset($parametros['nombreCliente']) || !isset($parametros['codigoMesa']) ||
-        !isset($parametros['items'])) {
-            throw new HttpBadRequestException($req, 'Debe enviar nombre del cliente, codigo mesa y los items');
-        }
         //parsear el array a un array de ItemPedido
         $itemsParseados = ItemPedido::ConvertirAArrayItems($parametros['items']);
 
@@ -94,20 +106,13 @@ class PedidoController implements IController {
             throw new HttpBadRequestException($req); 
         }
 
-        //validar que mesa este libre
-        $estadoMesaLibre = 5;
         $estadoMesaClienteEsperando = 1;
         $mesa = Mesa::GetMesaPorCodigo($parametros['codigoMesa']);
-        if (!isset($mesa)) {
-            throw new HttpNotFoundException($req, 'Mesa codigo '.$parametros['codigoMesa'].' no existe'); 
-        }
-        if ( $mesa->idEstado !== $estadoMesaLibre ) {
-            throw new HttpBadRequestException($req, 'La mesa esta ocupada'); 
-        }
+        
         $pedido = new Pedido($codigo, $parametros['nombreCliente'],
         $parametros['codigoMesa'], $estado->id, $estado->estado);
-        echo 'tienmpo estimado';
-        echo json_encode(['tiempo_estimado' => $pedido->tiempoEstimado]);
+        //echo 'tienmpo estimado';
+        //echo json_encode(['tiempo_estimado' => $pedido->tiempoEstimado]);
         $pedido->items = $itemsParseados;
         $pedido->CalcularTotal();
         $id = $pedido->CrearPedido();
@@ -140,6 +145,7 @@ class PedidoController implements IController {
         return $res; 
     }
     //ver
+    //que el cocinero ingrese el tiempo de espera cuando se encargar del pedido
     public function Update(Request $req, Response $res, array $args = []) {
         $parametros = $req->getParsedBody();
         //$codigo = generarCodigo(5);
@@ -195,6 +201,89 @@ class PedidoController implements IController {
         $mesa->idEstado = $mesaClienteEsperando;
         $mesa->ModificarMesa();
         $res->getBody()->write(json_encode(['mensaje' => "Pedido creado", 'id' => $id, 'codigo' => $codigo]));
+
+        return $res;
+    }
+
+    public function AtenderPedidoBebidas(Request $req, Response $res, array $args = []) {
+        $parametros = $req->getParsedBody();
+        //validar tiempo estimado
+        $minutos = $parametros['minutosEstimado'];
+        $horaEstimada = new DateTime();
+        $horaEstimada->add(new DateInterval('PT'.$minutos.'M')); 
+        $pedido = Pedido::GetPedido(intval($parametros['id']));
+
+        if (!isset($pedido->tiempoEstimado) || $horaEstimada > $pedido->tiempoEstimado) {
+            $pedido->tiempoEstimado = $horaEstimada;
+        }
+
+        $idEstadoEnPreparacion = 2;
+        $estado = EstadoPedido::GetEstadoPorId($idEstadoEnPreparacion);
+        if (!isset($estado)) {
+            throw new HttpBadRequestException($req, 'Estado pedido invalido'); 
+        }
+
+        $pedido->idEstado = $estado->id;
+        $pedido->estado = $estado->estado;
+        $idTipoBebida = 1;
+        ItemPedido::SetEstadoItemsPorTipoProducto($pedido->id, $idEstadoEnPreparacion, $idTipoBebida);
+    
+        $res->getBody()->write(json_encode(['mensaje' => "Se estan preparando las bebidas"]));
+
+        return $res;
+    }
+    public function AtenderPedidoComidas(Request $req, Response $res, array $args = []) {
+        $parametros = $req->getParsedBody();
+        //validar tiempo estimado
+        $minutos = $parametros['minutosEstimado'];
+        $horaEstimada = new DateTime();
+        $horaEstimada->add(new DateInterval('PT'.$minutos.'M')); 
+        $pedido = Pedido::GetPedido(intval($parametros['id']));
+
+        if (!isset($pedido->tiempoEstimado) || $horaEstimada > $pedido->tiempoEstimado) {
+            $pedido->tiempoEstimado = $horaEstimada;
+        }
+
+        $idEstadoEnPreparacion = 2;
+        $estado = EstadoPedido::GetEstadoPorId($idEstadoEnPreparacion);
+        if (!isset($estado)) {
+            throw new HttpBadRequestException($req, 'Estado pedido invalido'); 
+        }
+
+        $pedido->idEstado = $estado->id;
+        $pedido->estado = $estado->estado;
+        $idTipoComida = 2;
+        ItemPedido::SetEstadoItemsPorTipoProducto($pedido->id, $idEstadoEnPreparacion, $idTipoComida);
+    
+        $res->getBody()->write(json_encode(['mensaje' => "Se estan preparando las bebidas"]));
+
+        return $res;
+    }
+    public function AtenderPedidoCervezas(Request $req, Response $res, array $args = []) {
+        $parametros = $req->getParsedBody();
+        //validar tiempo estimado
+        $minutos = $parametros['minutosEstimado'];
+        $horaEstimada = new DateTime();
+        $horaEstimada->add(new DateInterval('PT'.$minutos.'M')); 
+        $pedido = Pedido::GetPedido(intval($parametros['id']));
+
+        if (!isset($pedido->tiempoEstimado) || $horaEstimada > $pedido->tiempoEstimado) {
+            $pedido->tiempoEstimado = $horaEstimada;
+        }
+
+        $idEstadoEnPreparacion = 2;
+        $estado = EstadoPedido::GetEstadoPorId($idEstadoEnPreparacion);
+        if (!isset($estado)) {
+            throw new HttpBadRequestException($req, 'Estado pedido invalido'); 
+        }
+
+        $pedido->idEstado = $estado->id;
+        $pedido->estado = $estado->estado;
+        $pedido->ModificarPedido();
+        $idTipoCerveza = 3;
+        ItemPedido::SetEstadoItemsPorTipoProducto($pedido->id, $idEstadoEnPreparacion, $idTipoCerveza);
+        
+        $res->getBody()->write(json_encode(['mensaje' => "Se estan preparando las bebidas"]));
 
         return $res;
     }

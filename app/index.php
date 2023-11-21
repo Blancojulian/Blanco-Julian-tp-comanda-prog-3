@@ -23,9 +23,13 @@ require_once './controllers/MesaController.php';
 require_once './controllers/ProductoController.php';
 require_once './controllers/PedidoController.php';
 require_once './controllers/LoginController.php';
+require_once './controllers/AuthController.php';
 require_once './middlewares/LoggerMiddleware.php';
 require_once './middlewares/ImagenMiddleware.php';
 require_once './middlewares/AuthMiddleware.php';
+
+$dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
+$dotenv->load();
 
 date_default_timezone_set('America/Argentina/Buenos_Aires');
 
@@ -120,21 +124,39 @@ $app->group('/producto', function (RouteCollectorProxy $group) {
 ->add(new AuthMiddleware());
 
 $app->group('/pedido', function (RouteCollectorProxy $group) {//sacar campo precio unitario
-    
+    //GetCervezasPendientes
+    $group->group('/pendientes', function (RouteCollectorProxy $groupPendientes) {
+        $groupPendientes->get('/bebidas[/]', \PedidoController::class . ':GetBebidasPendientes')->add(\AuthMiddleware::class . ':AutorizarBartender');
+        $groupPendientes->get('/comidas[/]', \PedidoController::class . ':GetComidasPendientes')->add(\AuthMiddleware::class . ':AutorizarCocinero');
+        $groupPendientes->get('/cervezas[/]', \PedidoController::class . ':GetCervezasPendientes')->add(\AuthMiddleware::class . ':AutorizarCervecero');
+        
+    })
+    ->add(\AuthMiddleware::class . ':RechazarMozo')
+    ->add(\AuthMiddleware::class . ':RechazarCliente');
+
+    $group->group('/atender', function (RouteCollectorProxy $groupAtender) {
+        $groupAtender->get('/bebidas[/]', \PedidoController::class . ':AtenderPedidoBebidas')->add(\AuthMiddleware::class . ':AutorizarBartender');
+        $groupAtender->get('/comidas[/]', \PedidoController::class . ':AtenderPedidoComidas')->add(\AuthMiddleware::class . ':AutorizarCocinero');
+        $groupAtender->get('/cervezas[/]', \PedidoController::class . ':AtenderPedidoCervezas')->add(\AuthMiddleware::class . ':AutorizarCervecero');
+    })
+    ->add(\PedidoMiddleware::class . ':ControlarAtenderPedido')
+    ->add(\AuthMiddleware::class . ':RechazarMozo')
+    ->add(\AuthMiddleware::class . ':RechazarCliente');
+
     $group->get('[/]', \PedidoController::class . ':GetAll')->add(\AuthMiddleware::class . ':RechazarCliente');
-    $group->get('/{id}', \PedidoController::class . ':Get');
+    $group->get('/{id}', \PedidoController::class . ':Get');//si se pone primero tapa las otras rutas
+
     $group->get('/criterio/{idEstado}', \PedidoController::class . ':GetAllPorCriterio')->add(\AuthMiddleware::class . ':AutorizarSocio');
     $group->delete('/{id}', \PedidoController::class . ':Delete')->add(\AuthMiddleware::class . ':AutorizarMozo');
-    $group->post('[/]', \PedidoController::class . ':Create')->add(\AuthMiddleware::class . ':AutorizarMozo');
-    $group->put('[/]', \PedidoController::class . ':Update')->add(\AuthMiddleware::class . ':RechazarCliente');
+    $group->post('[/]', \PedidoController::class . ':Create')->add(\PedidoMiddleware::class . ':ControlarParametros')->add(\AuthMiddleware::class . ':AutorizarMozo');
+    $group->put('[/]', \PedidoController::class . ':Update')->add(\PedidoMiddleware::class . ':ControlarParametros')->add(\AuthMiddleware::class . ':AutorizarMozo');
 
 })->add(new AuthMiddleware());
 
 $app->group('/login', function (RouteCollectorProxy $group) {
     
-    $group->post('[/]', \LoginController::class . ':login');
-    $group->get('[/]', \LoginController::class . ':GetRol');
-    $group->post('/logout', \LoginController::class . ':Logout');
+    $group->post('[/]', \AuthController::class . ':login');
+    //$group->get('[/]', \LoginController::class . ':GetRol');
 
 });
 

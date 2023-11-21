@@ -199,12 +199,15 @@ class Pedido implements JsonSerializable
         return $pedidos;
     }
 
-    public static function GetPedidosPorTipoProducto($idTipoProducto, $idEstadoPedido)
+    public static function GetPedidosPorTipoProducto($idTipoProducto, $idEstadoPedido = null)
     {
         $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
         $query = 'SELECT p.*, e.estado FROM pedidos p LEFT JOIN estadosPedido e ON p.idEstado = e.id 
         LEFT JOIN itemsPedido i ON i.idPedido = p.id LEFT JOIN productos pro ON i.idProducto = pro.id 
-        WHERE p.cancelado = 0 AND pro.idTipoProducto = :idTipoProducto AND p.idEstado = :idEstadoPedido';
+        WHERE p.cancelado = 0 AND pro.idTipoProducto = :idTipoProducto';
+        if (isset($idEstadoPedido)) {
+            $query .= ' AND p.idEstado = :idEstadoPedido';
+        }
         $consulta = $objetoAccesoDato->RetornarConsulta($query);
         $consulta->bindValue(':idTipoProducto', $idTipoProducto, PDO::PARAM_INT);
         $consulta->bindValue(':idEstadoPedido', $idEstadoPedido, PDO::PARAM_INT);

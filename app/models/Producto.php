@@ -32,7 +32,6 @@ class Producto implements JsonSerializable
         $consulta->bindValue(':precio', $this->precio, PDO::PARAM_STR);
         $consulta->bindValue(':stock', $this->stock, PDO::PARAM_INT);
         $consulta->bindValue(':idTipoProducto', $this->idTipoProducto, PDO::PARAM_INT);
-        $consulta->bindValue(':minutosPreparacion', $this->minutosPreparacion, PDO::PARAM_INT);
         $consulta->bindValue(':baja', $this->baja, PDO::PARAM_BOOL);
 
         $consulta->execute();
@@ -42,13 +41,12 @@ class Producto implements JsonSerializable
     public function CrearProducto()
     {
         $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
-        $query = 'INSERT INTO productos (nombre,precio,stock,idTipoProducto,minutosPreparacion,baja)values(:nombre,:precio,:stock,:idTipoProducto,:minutosPreparacion,:baja)';
+        $query = 'INSERT INTO productos (nombre,precio,stock,idTipoProducto,baja)values(:nombre,:precio,:stock,:idTipoProducto,:baja)';
         $consulta = $objetoAccesoDato->RetornarConsulta($query);
         $consulta->bindValue(':nombre', $this->nombre, PDO::PARAM_STR);
         $consulta->bindValue(':precio', $this->precio, PDO::PARAM_STR);
         $consulta->bindValue(':stock', $this->stock, PDO::PARAM_INT);
         $consulta->bindValue(':idTipoProducto', $this->idTipoProducto, PDO::PARAM_INT);
-        $consulta->bindValue(':minutosPreparacion', $this->minutosPreparacion, PDO::PARAM_INT);
         $consulta->bindValue(':baja', $this->baja, PDO::PARAM_BOOL);
 
         $consulta->execute();
@@ -57,7 +55,7 @@ class Producto implements JsonSerializable
     public function ModificarProducto()
     {
         $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
-        $query = 'UPDATE productos SET nombre = :nombre, precio = :precio, stock = :stock, idTipoProducto =:idTipoProducto, minutosPreparacion = :minutosPreparacion, baja = :baja WHERE id = :id';
+        $query = 'UPDATE productos SET nombre = :nombre, precio = :precio, stock = :stock, idTipoProducto =:idTipoProducto, baja = :baja WHERE id = :id';
         
         $consulta = $objetoAccesoDato->RetornarConsulta($query);
         $consulta->bindValue(':id', $this->id, PDO::PARAM_INT);
@@ -65,7 +63,6 @@ class Producto implements JsonSerializable
         $consulta->bindValue(':precio', $this->precio, PDO::PARAM_STR);
         $consulta->bindValue(':stock', $this->stock, PDO::PARAM_INT);
         $consulta->bindValue(':idTipoProducto', $this->idTipoProducto, PDO::PARAM_INT);
-        $consulta->bindValue(':minutosPreparacion', $this->minutosPreparacion, PDO::PARAM_INT);
         $consulta->bindValue(':baja', $this->baja, PDO::PARAM_BOOL);
         $consulta->execute();
         return $objetoAccesoDato->RetornarUltimoIdInsertado();
@@ -85,13 +82,12 @@ class Producto implements JsonSerializable
         $consulta->bindColumn('stock', $stock, PDO::PARAM_INT);
         $consulta->bindColumn('idTipoProducto', $idTipoProducto, PDO::PARAM_INT);
         $consulta->bindColumn('tipo', $tipo, PDO::PARAM_STR);
-        $consulta->bindColumn('minutosPreparacion', $minutosPreparacion, PDO::PARAM_INT);
         $consulta->bindColumn('baja', $baja, PDO::PARAM_BOOL);
 
         $producto = null;
         $productos = [];
         while ($fila = $consulta->fetch(PDO::FETCH_BOUND)) {
-            $producto = new Producto($nombre, floatval($precio), $stock, $idTipoProducto, $tipo, $minutosPreparacion, $baja, $id);
+            $producto = new Producto($nombre, floatval($precio), $stock, $idTipoProducto, $tipo, $baja, $id);
             array_push($productos, $producto);
         }
         return $productos;
@@ -112,13 +108,12 @@ class Producto implements JsonSerializable
         $consulta->bindColumn('stock', $stock, PDO::PARAM_INT);
         $consulta->bindColumn('idTipoProducto', $idTipoProducto, PDO::PARAM_INT);
         $consulta->bindColumn('tipo', $tipo, PDO::PARAM_STR);
-        $consulta->bindColumn('minutosPreparacion', $minutosPreparacion, PDO::PARAM_INT);
         $consulta->bindColumn('baja', $baja, PDO::PARAM_BOOL);
 
         $producto = null;
 
         if ($consulta->fetch(PDO::FETCH_BOUND)) {
-            $producto = new Producto($nombre, floatval($precio), $stock, $idTipoProducto, $tipo, $minutosPreparacion, $baja, $id);
+            $producto = new Producto($nombre, floatval($precio), $stock, $idTipoProducto, $tipo, $baja, $id);
         }
         
         return $producto;
@@ -139,13 +134,12 @@ class Producto implements JsonSerializable
         $consulta->bindColumn('stock', $stock, PDO::PARAM_INT);
         $consulta->bindColumn('idTipoProducto', $idTipoProducto, PDO::PARAM_INT);
         $consulta->bindColumn('tipo', $tipo, PDO::PARAM_STR);
-        $consulta->bindColumn('minutosPreparacion', $minutosPreparacion, PDO::PARAM_INT);
         $consulta->bindColumn('baja', $baja, PDO::PARAM_BOOL);
 
         $producto = null;
 
         if ($consulta->fetch(PDO::FETCH_BOUND)) {
-            $producto = new Producto($nombre, floatval($precio), $stock, $idTipoProducto, $tipo, $minutosPreparacion, $baja, $id);
+            $producto = new Producto($nombre, floatval($precio), $stock, $idTipoProducto, $tipo, $baja, $id);
         }
         
         return $producto;
@@ -165,13 +159,12 @@ class Producto implements JsonSerializable
         $consulta->bindColumn('stock', $stock, PDO::PARAM_INT);
         $consulta->bindColumn('idTipoProducto', $idTipoProducto, PDO::PARAM_INT);
         $consulta->bindColumn('tipo', $tipo, PDO::PARAM_STR);
-        $consulta->bindColumn('minutosPreparacion', $minutosPreparacion, PDO::PARAM_INT);
         $consulta->bindColumn('baja', $baja, PDO::PARAM_BOOL);
 
         $producto = null;
         $productos = [];
         while ($fila = $consulta->fetch(PDO::FETCH_BOUND)) {
-            $producto = new Producto($nombre, floatval($precio), $stock, $idTipoProducto, $tipo, $minutosPreparacion, $baja, $id);
+            $producto = new Producto($nombre, floatval($precio), $stock, $idTipoProducto, $tipo, $baja, $id);
             array_push($productos, $producto);
         }
         return $productos;
@@ -191,13 +184,12 @@ class Producto implements JsonSerializable
         $consulta->bindColumn('stock', $stock, PDO::PARAM_INT);
         $consulta->bindColumn('idTipoProducto', $idTipoProducto, PDO::PARAM_INT);
         $consulta->bindColumn('tipo', $tipo, PDO::PARAM_STR);
-        $consulta->bindColumn('minutosPreparacion', $minutosPreparacion, PDO::PARAM_INT);
         $consulta->bindColumn('baja', $baja, PDO::PARAM_BOOL);
 
         $producto = null;
         $productos = [];
         while ($fila = $consulta->fetch(PDO::FETCH_BOUND)) {
-            $producto = new Producto($nombre, floatval($precio), $stock, $idTipoProducto, $tipo, $minutosPreparacion, $baja, $id);
+            $producto = new Producto($nombre, floatval($precio), $stock, $idTipoProducto, $tipo, $baja, $id);
             array_push($productos, $producto);
         }
         return $productos;
