@@ -150,8 +150,8 @@ class PedidoController implements IController {
         $parametros = $req->getParsedBody();
         //$codigo = generarCodigo(5);
         //var_dump($parametros);
-        if ( !!isset($parametros['id']) || !isset($parametros['nombreCliente']) || !isset($parametros['codigoMesa']) ||
-        !!isset($parametros['idEstado']) || !isset($parametros['items'])) {
+        if ( !isset($parametros['id']) || !isset($parametros['nombreCliente']) || !isset($parametros['codigoMesa']) ||
+        !isset($parametros['idEstado']) || !isset($parametros['items'])) {
             throw new HttpBadRequestException($req, 'Debe enviar id, nombre del cliente, codigo mesa y los items');
         }
         //parsear el array a un array de ItemPedido
