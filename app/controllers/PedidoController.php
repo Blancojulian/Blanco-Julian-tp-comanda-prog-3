@@ -309,14 +309,10 @@ class PedidoController implements IController {
 
     public function TerminarPedidoCervezas(Request $req, Response $res, array $args = []) {
         $parametros = $req->getParsedBody();
-        //validar tiempo estimado
-        $minutos = $parametros['minutosEstimado'];
-        $horaEstimada = new DateTime();
-        $horaEstimada->add(new DateInterval('PT'.$minutos.'M')); 
         $pedido = Pedido::GetPedido(intval($parametros['id']));
 
-        if (!isset($pedido->tiempoEstimado) || $horaEstimada > $pedido->tiempoEstimado) {
-            $pedido->tiempoEstimado = $horaEstimada;
+        if (!isset($pedido)) {
+            throw new HttpBadRequestException($req, 'Pedido no existe'); 
         }
         $idEstadoListoParaServir = 3;
         $estado = EstadoPedido::GetEstadoPorId($idEstadoListoParaServir);
@@ -336,15 +332,11 @@ class PedidoController implements IController {
     }
 
     public function TerminarPedidoBebidas(Request $req, Response $res, array $args = []) {
-        $parametros = $req->getParsedBody();
-        //validar tiempo estimado
-        $minutos = $parametros['minutosEstimado'];
-        $horaEstimada = new DateTime();
-        $horaEstimada->add(new DateInterval('PT'.$minutos.'M')); 
+        $parametros = $req->getParsedBody(); 
         $pedido = Pedido::GetPedido(intval($parametros['id']));
 
-        if (!isset($pedido->tiempoEstimado) || $horaEstimada > $pedido->tiempoEstimado) {
-            $pedido->tiempoEstimado = $horaEstimada;
+        if (!isset($pedido)) {
+            throw new HttpBadRequestException($req, 'Pedido no existe'); 
         }
         $idEstadoListoParaServir = 3;
         $estado = EstadoPedido::GetEstadoPorId($idEstadoListoParaServir);
@@ -365,14 +357,10 @@ class PedidoController implements IController {
 
     public function TerminarPedidoComidas(Request $req, Response $res, array $args = []) {
         $parametros = $req->getParsedBody();
-        //validar tiempo estimado
-        $minutos = $parametros['minutosEstimado'];
-        $horaEstimada = new DateTime();
-        $horaEstimada->add(new DateInterval('PT'.$minutos.'M')); 
         $pedido = Pedido::GetPedido(intval($parametros['id']));
 
-        if (!isset($pedido->tiempoEstimado) || $horaEstimada > $pedido->tiempoEstimado) {
-            $pedido->tiempoEstimado = $horaEstimada;
+        if (!isset($pedido)) {
+            throw new HttpBadRequestException($req, 'Pedido no existe'); 
         }
         $idEstadoListoParaServir = 3;
         $estado = EstadoPedido::GetEstadoPorId($idEstadoListoParaServir);
