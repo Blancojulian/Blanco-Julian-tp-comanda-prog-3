@@ -135,18 +135,18 @@ $app->group('/pedido', function (RouteCollectorProxy $group) {//sacar campo prec
     ->add(\AuthMiddleware::class . ':RechazarCliente');
 
     $group->group('/atender', function (RouteCollectorProxy $groupAtender) {
-        $groupAtender->get('/bebidas[/]', \PedidoController::class . ':AtenderPedidoBebidas')->add(\AuthMiddleware::class . ':AutorizarBartender');
-        $groupAtender->get('/comidas[/]', \PedidoController::class . ':AtenderPedidoComidas')->add(\AuthMiddleware::class . ':AutorizarCocinero');
-        $groupAtender->get('/cervezas[/]', \PedidoController::class . ':AtenderPedidoCervezas')->add(\AuthMiddleware::class . ':AutorizarCervecero');
+        $groupAtender->post('/bebidas[/]', \PedidoController::class . ':AtenderPedidoBebidas')->add(\AuthMiddleware::class . ':AutorizarBartender');
+        $groupAtender->post('/comidas[/]', \PedidoController::class . ':AtenderPedidoComidas')->add(\AuthMiddleware::class . ':AutorizarCocinero');
+        $groupAtender->post('/cervezas[/]', \PedidoController::class . ':AtenderPedidoCervezas')->add(\AuthMiddleware::class . ':AutorizarCervecero');
     })
     ->add(\PedidoMiddleware::class . ':ControlarAtenderPedido')
     ->add(\AuthMiddleware::class . ':RechazarMozo')
     ->add(\AuthMiddleware::class . ':RechazarCliente');
 
     $group->group('/terminar', function (RouteCollectorProxy $groupTerminar) {
-        $groupTerminar->get('/bebidas[/]', \PedidoController::class . ':TerminarPedidoBebidas')->add(\AuthMiddleware::class . ':AutorizarBartender');
-        $groupTerminar->get('/comidas[/]', \PedidoController::class . ':TerminarPedidoComidas')->add(\AuthMiddleware::class . ':AutorizarCocinero');
-        $groupTerminar->get('/cervezas[/]', \PedidoController::class . ':TerminarPedidoCervezas')->add(\AuthMiddleware::class . ':AutorizarCervecero');
+        $groupTerminar->post('/bebidas[/]', \PedidoController::class . ':TerminarPedidoBebidas')->add(\AuthMiddleware::class . ':AutorizarBartender');
+        $groupTerminar->post('/comidas[/]', \PedidoController::class . ':TerminarPedidoComidas')->add(\AuthMiddleware::class . ':AutorizarCocinero');
+        $groupTerminar->post('/cervezas[/]', \PedidoController::class . ':TerminarPedidoCervezas')->add(\AuthMiddleware::class . ':AutorizarCervecero');
     })
     ->add(\PedidoMiddleware::class . ':ControlarAtenderPedido')
     ->add(\AuthMiddleware::class . ':RechazarMozo')
