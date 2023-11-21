@@ -287,6 +287,111 @@ class PedidoController implements IController {
 
         return $res;
     }
+
+    private static function TerminarPedido($idPedido) {
+        $pedido = Pedido::GetPedido(intval($idPedido));
+        $estaListoPedido = true;
+        $idEstadoListoParaServir = 3;
+        $estado = EstadoPedido::GetEstadoPorId($idEstadoListoParaServir);
+
+        foreach ($pedido->items as $item) {
+            if ($item->idEstado != $idEstadoListoParaServir) {
+                $estaListoPedido = false;
+                break;
+            }
+        }
+        if ($estaListoPedido) {
+            $pedido->idEstado = $estado->id;
+            $pedido->estado = $estado->estado;
+            $pedido->ModificarPedido();
+        }
+    }
+
+    public function TerminarPedidoCervezas(Request $req, Response $res, array $args = []) {
+        $parametros = $req->getParsedBody();
+        //validar tiempo estimado
+        $minutos = $parametros['minutosEstimado'];
+        $horaEstimada = new DateTime();
+        $horaEstimada->add(new DateInterval('PT'.$minutos.'M')); 
+        $pedido = Pedido::GetPedido(intval($parametros['id']));
+
+        if (!isset($pedido->tiempoEstimado) || $horaEstimada > $pedido->tiempoEstimado) {
+            $pedido->tiempoEstimado = $horaEstimada;
+        }
+        $idEstadoListoParaServir = 3;
+        $estado = EstadoPedido::GetEstadoPorId($idEstadoListoParaServir);
+        if (!isset($estado)) {
+            throw new HttpBadRequestException($req, 'Estado pedido invalido'); 
+        }
+        
+        
+        $idTipoCerveza = 3;
+        ItemPedido::SetEstadoItemsPorTipoProducto($pedido->id, $idEstadoListoParaServir, $idTipoCerveza);
+
+        self::TerminarPedido($pedido->id);
+        
+        $res->getBody()->write(json_encode(['mensaje' => "Se estan preparando las bebidas"]));
+
+        return $res;
+    }
+
+    public function TerminarPedidoBebidas(Request $req, Response $res, array $args = []) {
+        $parametros = $req->getParsedBody();
+        //validar tiempo estimado
+        $minutos = $parametros['minutosEstimado'];
+        $horaEstimada = new DateTime();
+        $horaEstimada->add(new DateInterval('PT'.$minutos.'M')); 
+        $pedido = Pedido::GetPedido(intval($parametros['id']));
+
+        if (!isset($pedido->tiempoEstimado) || $horaEstimada > $pedido->tiempoEstimado) {
+            $pedido->tiempoEstimado = $horaEstimada;
+        }
+        $idEstadoListoParaServir = 3;
+        $estado = EstadoPedido::GetEstadoPorId($idEstadoListoParaServir);
+        if (!isset($estado)) {
+            throw new HttpBadRequestException($req, 'Estado pedido invalido'); 
+        }
+        
+        
+        $idTipoBebida = 1;
+        ItemPedido::SetEstadoItemsPorTipoProducto($pedido->id, $idEstadoListoParaServir, $idTipoBebida);
+
+        self::TerminarPedido($pedido->id);
+        
+        $res->getBody()->write(json_encode(['mensaje' => "Se estan preparando las bebidas"]));
+
+        return $res;
+    }
+
+    public function TerminarPedidoComidas(Request $req, Response $res, array $args = []) {
+        $parametros = $req->getParsedBody();
+        //validar tiempo estimado
+        $minutos = $parametros['minutosEstimado'];
+        $horaEstimada = new DateTime();
+        $horaEstimada->add(new DateInterval('PT'.$minutos.'M')); 
+        $pedido = Pedido::GetPedido(intval($parametros['id']));
+
+        if (!isset($pedido->tiempoEstimado) || $horaEstimada > $pedido->tiempoEstimado) {
+            $pedido->tiempoEstimado = $horaEstimada;
+        }
+        $idEstadoListoParaServir = 3;
+        $estado = EstadoPedido::GetEstadoPorId($idEstadoListoParaServir);
+        if (!isset($estado)) {
+            throw new HttpBadRequestException($req, 'Estado pedido invalido'); 
+        }
+        
+        
+        $idTipoComida = 2;
+        ItemPedido::SetEstadoItemsPorTipoProducto($pedido->id, $idEstadoListoParaServir, $idTipoComida);
+
+        self::TerminarPedido($pedido->id);
+        
+        $res->getBody()->write(json_encode(['mensaje' => "Se estan preparando las bebidas"]));
+
+        return $res;
+    }
+
+    
 }
 
 ?>

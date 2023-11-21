@@ -143,6 +143,15 @@ $app->group('/pedido', function (RouteCollectorProxy $group) {//sacar campo prec
     ->add(\AuthMiddleware::class . ':RechazarMozo')
     ->add(\AuthMiddleware::class . ':RechazarCliente');
 
+    $group->group('/terminar', function (RouteCollectorProxy $groupTerminar) {
+        $groupTerminar->get('/bebidas[/]', \PedidoController::class . ':TerminarPedidoBebidas')->add(\AuthMiddleware::class . ':AutorizarBartender');
+        $groupTerminar->get('/comidas[/]', \PedidoController::class . ':TerminarPedidoComidas')->add(\AuthMiddleware::class . ':AutorizarCocinero');
+        $groupTerminar->get('/cervezas[/]', \PedidoController::class . ':TerminarPedidoCervezas')->add(\AuthMiddleware::class . ':AutorizarCervecero');
+    })
+    ->add(\PedidoMiddleware::class . ':ControlarAtenderPedido')
+    ->add(\AuthMiddleware::class . ':RechazarMozo')
+    ->add(\AuthMiddleware::class . ':RechazarCliente');
+
     $group->get('[/]', \PedidoController::class . ':GetAll')->add(\AuthMiddleware::class . ':RechazarCliente');
     $group->get('/{id}', \PedidoController::class . ':Get');//si se pone primero tapa las otras rutas
 
