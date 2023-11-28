@@ -38,7 +38,9 @@ $app->setBasePath('/Blanco-Julian-tp-comanda-prog-3/app');
 $app->addBodyParsingMiddleware();
 $app->addRoutingMiddleware();
 //$app->set('upload_directory', __DIR__ . '/uploads');
-
+//hash m5
+//https://www.php.net/manual/en/function.password-hash.php
+//agregar fecha alta modificacion, baja
 $customErrorHandler = function (
     Request $request,
     Throwable $exception,
@@ -96,8 +98,7 @@ $app->group('/empleado', function (RouteCollectorProxy $group) {
     $group->put('[/]', \EmpleadoController::class . ':Update');
 
 })
-->add(\AuthMiddleware::class . ':AutorizarSocio')
-->add(new AuthMiddleware());
+->add(new AuthMiddleware('socio'));
 
 $app->group('/mesa', function (RouteCollectorProxy $group) {
     
@@ -108,8 +109,7 @@ $app->group('/mesa', function (RouteCollectorProxy $group) {
     $group->put('[/]', \MesaController::class . ':Update');
 
 })
-->add(\AuthMiddleware::class . ':AutorizarMozo')
-->add(new AuthMiddleware());
+->add(new AuthMiddleware('mozo'));
 
 $app->group('/producto', function (RouteCollectorProxy $group) {
     
@@ -120,45 +120,38 @@ $app->group('/producto', function (RouteCollectorProxy $group) {
     $group->put('[/]', \ProductoController::class . ':Update');
 
 })
-->add(\AuthMiddleware::class . ':AutorizarSocio')
-->add(new AuthMiddleware());
+->add(new AuthMiddleware('socio'));
 
 $app->group('/pedido', function (RouteCollectorProxy $group) {//sacar campo precio unitario
     //GetCervezasPendientes
     $group->group('/pendientes', function (RouteCollectorProxy $groupPendientes) {
-        $groupPendientes->get('/bebidas[/]', \PedidoController::class . ':GetBebidasPendientes')->add(\AuthMiddleware::class . ':AutorizarBartender');
-        $groupPendientes->get('/comidas[/]', \PedidoController::class . ':GetComidasPendientes')->add(\AuthMiddleware::class . ':AutorizarCocinero');
-        $groupPendientes->get('/cervezas[/]', \PedidoController::class . ':GetCervezasPendientes')->add(\AuthMiddleware::class . ':AutorizarCervecero');
+        $groupPendientes->get('/bebidas[/]', \PedidoController::class . ':GetBebidasPendientes')->add(new AuthMiddleware('bartender'));
+        $groupPendientes->get('/comidas[/]', \PedidoController::class . ':GetComidasPendientes')->add(new AuthMiddleware('cocinero'));
+        $groupPendientes->get('/cervezas[/]', \PedidoController::class . ':GetCervezasPendientes')->add(new AuthMiddleware('cervecero'));
         
-    })
-    ->add(\AuthMiddleware::class . ':RechazarMozo')
-    ->add(\AuthMiddleware::class . ':RechazarCliente');
+    });
 
     $group->group('/atender', function (RouteCollectorProxy $groupAtender) {
-        $groupAtender->post('/bebidas[/]', \PedidoController::class . ':AtenderPedidoBebidas')->add(\AuthMiddleware::class . ':AutorizarBartender');
-        $groupAtender->post('/comidas[/]', \PedidoController::class . ':AtenderPedidoComidas')->add(\AuthMiddleware::class . ':AutorizarCocinero');
-        $groupAtender->post('/cervezas[/]', \PedidoController::class . ':AtenderPedidoCervezas')->add(\AuthMiddleware::class . ':AutorizarCervecero');
+        $groupAtender->post('/bebidas[/]', \PedidoController::class . ':AtenderPedidoBebidas')->add(new AuthMiddleware('bartender'));
+        $groupAtender->post('/comidas[/]', \PedidoController::class . ':AtenderPedidoComidas')->add(new AuthMiddleware('cocinero'));
+        $groupAtender->post('/cervezas[/]', \PedidoController::class . ':AtenderPedidoCervezas')->add(new AuthMiddleware('cervecero'));
     })
-    ->add(\PedidoMiddleware::class . ':ControlarAtenderPedido')
-    ->add(\AuthMiddleware::class . ':RechazarMozo')
-    ->add(\AuthMiddleware::class . ':RechazarCliente');
+    ->add(\PedidoMiddleware::class . ':ControlarAtenderPedido');
 
     $group->group('/terminar', function (RouteCollectorProxy $groupTerminar) {
-        $groupTerminar->post('/bebidas[/]', \PedidoController::class . ':TerminarPedidoBebidas')->add(\AuthMiddleware::class . ':AutorizarBartender');
-        $groupTerminar->post('/comidas[/]', \PedidoController::class . ':TerminarPedidoComidas')->add(\AuthMiddleware::class . ':AutorizarCocinero');
-        $groupTerminar->post('/cervezas[/]', \PedidoController::class . ':TerminarPedidoCervezas')->add(\AuthMiddleware::class . ':AutorizarCervecero');
+        $groupTerminar->post('/bebidas[/]', \PedidoController::class . ':TerminarPedidoBebidas')->add(new AuthMiddleware('bartender'));
+        $groupTerminar->post('/comidas[/]', \PedidoController::class . ':TerminarPedidoComidas')->add(new AuthMiddleware('cocinero'));
+        $groupTerminar->post('/cervezas[/]', \PedidoController::class . ':TerminarPedidoCervezas')->add(new AuthMiddleware('cervecero'));
     })
-    ->add(\PedidoMiddleware::class . ':ControlarAtenderPedido')
-    ->add(\AuthMiddleware::class . ':RechazarMozo')
-    ->add(\AuthMiddleware::class . ':RechazarCliente');
+    ->add(\PedidoMiddleware::class . ':ControlarAtenderPedido');
 
-    $group->get('[/]', \PedidoController::class . ':GetAll')->add(\AuthMiddleware::class . ':RechazarCliente');
+    $group->get('[/]', \PedidoController::class . ':GetAll')->add(new AuthMiddleware('socio'));
     $group->get('/{id}', \PedidoController::class . ':Get');//si se pone primero tapa las otras rutas
 
-    $group->get('/criterio/{idEstado}', \PedidoController::class . ':GetAllPorCriterio')->add(\AuthMiddleware::class . ':AutorizarSocio');
+    $group->get('/criterio/{idEstado}', \PedidoController::class . ':GetAllPorCriterio')->add(new AuthMiddleware('socio'));
     $group->delete('/{id}', \PedidoController::class . ':Delete')->add(\AuthMiddleware::class . ':AutorizarMozo');
-    $group->post('[/]', \PedidoController::class . ':Create')->add(\PedidoMiddleware::class . ':ControlarParametros')->add(\AuthMiddleware::class . ':AutorizarMozo');
-    $group->put('[/]', \PedidoController::class . ':Update')->add(\PedidoMiddleware::class . ':ControlarParametros')->add(\AuthMiddleware::class . ':AutorizarMozo');
+    $group->post('[/]', \PedidoController::class . ':Create')->add(\PedidoMiddleware::class . ':ControlarParametros')->add(new AuthMiddleware('mozo'));
+    $group->put('[/]', \PedidoController::class . ':Update')->add(\PedidoMiddleware::class . ':ControlarParametros')->add(new AuthMiddleware('mozo'));
 
 })->add(new AuthMiddleware());
 

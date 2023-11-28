@@ -15,6 +15,8 @@ use Slim\Exception\HttpNotFoundException;
 
 class PedidoController implements IController {
 
+    private $_carpetaClientes = './Imagenes/ImagenesDePedidos/2023/';
+
 
     public function Get(Request $req, Response $res, array $args = []) {
         if (!isset($args['id'])) {
@@ -93,8 +95,13 @@ class PedidoController implements IController {
     }
     //ver
     //el estado inicial va ser pendiente
+    //agregar tiempo estimado a cada item, y cada empleado que se encarga
+    //sacar cantidad, que se repitan los item del pedido
+    //fecha de cheacion por cada item
     public function Create(Request $req, Response $res, array $args = []) {//ver si no habria que pedir el estado, si es una mesa nueva no deberia estar cerrada
         $parametros = $req->getParsedBody();
+        $uploadedFiles = $req->getUploadedFiles();
+        $uploadedFile = $uploadedFiles['imagen'];
         $codigo = generarCodigo(5);
         //parsear el array a un array de ItemPedido
         $itemsParseados = ItemPedido::ConvertirAArrayItems($parametros['items']);
@@ -119,6 +126,10 @@ class PedidoController implements IController {
 
         ItemPedido::CrearItems($id, $pedido->items);//hacer if para comprobar si falla
         
+        $filename = FormatearNumero($pedido->id) . "$codigo-$pedido->codigoMesa.jpg";
+        moveUploadedFile($this->_carpetaPedido, $filename, $uploadedFile);
+        $pedido->SetArchivoImagen("$filename.jpg");
+
         //cambiar mesa a cliente esperando
         $mesa->idEstado = $estadoMesaClienteEsperando;
         $mesa->ModificarMesa();
@@ -146,6 +157,7 @@ class PedidoController implements IController {
     }
     //ver
     //que el cocinero ingrese el tiempo de espera cuando se encargar del pedido
+    //hay que comparar los viejos items y los nuevos, eliminar los que no estan y update los otros
     public function Update(Request $req, Response $res, array $args = []) {
         $parametros = $req->getParsedBody();
         //$codigo = generarCodigo(5);

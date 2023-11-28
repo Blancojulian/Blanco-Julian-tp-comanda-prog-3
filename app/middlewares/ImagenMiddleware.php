@@ -1,10 +1,12 @@
 <?php
 
+require_once './utils/BaseRespuestaError.php';
+
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Psr\Http\Server\RequestHandlerInterface as RequestHandler;
 use Slim\Psr7\Response;
 
-class ImagenMiddleware
+class ImagenMiddleware extends BaseRespuestaError
 {
     /**
      * Example middleware invokable class
@@ -16,37 +18,31 @@ class ImagenMiddleware
      */
     public function __invoke(Request $request, RequestHandler $handler): Response
     {   
-        echo 'imagenMiddleware';
-        // Fecha antes
-        $before = date('Y-m-d H:i:s');
-        
-        // Continua al controller
-        $response = $handler->handle($request);
-        $existingContent = json_decode($response->getBody());
-    
-        // Despues
-        $response = new Response();
-        $existingContent->fechaAntes = $before;
-        $existingContent->fechaDespues = date('Y-m-d H:i:s');
-        
-        $payload = json_encode($existingContent);
+        $uploadedFiles = $request->getUploadedFiles();
+        $mb = 1024 * 1024;
 
-        $response->getBody()->write($payload);
-        return $response->withHeader('Content-Type', 'application/json');
+        if (!isset($uploadedFiles['imagen'])) {
+            return self::RespuestaError(400, 'No se envio la imagen');
+        }
+
+        if ($uploadedFiles['imagen']->getError() !== UPLOAD_ERR_OK) {
+            return self::RespuestaError(400, 'Error al subir la imagen');
+        }
+        
+        $ext = pathinfo($uploadedFiles['imagen']->getClientFilename(), PATHINFO_EXTENSION);
+        if ($ext !== 'jpg') {
+            return self::RespuestaError(400, 'La extensión incorrecta, se permiten archivos .jpg');
+          }
+
+        if ($uploadedFiles['imagen']->getSize() > (10 * $mb)) {
+            return self::RespuestaError(400, 'El tamaño del archivo supera el limite, se permiten archivos de 10 mb máximo.');
+        }
+        
+        $response = $handler->handle($request);
+
+        return $response;
     }
 
-    private function moveUploadedFile(string $directory, UploadedFileInterface $uploadedFile)
-{
-    $extension = pathinfo($uploadedFile->getClientFilename(), PATHINFO_EXTENSION);
-
-    // see http://php.net/manual/en/function.random-bytes.php
-    $basename = bin2hex(random_bytes(8));
-    $filename = sprintf('%s.%0.8s', $basename, $extension);
-
-    $uploadedFile->moveTo($directory . DIRECTORY_SEPARATOR . $filename);
-
-    return $filename;
-}
 }
 
 ?>

@@ -11,7 +11,7 @@ class Mesa implements JsonSerializable
     public $idEstado;
     public $baja;
     
-    public function __construct($codigo, $idEstado, $estado, $baja = false, $id = null) {
+    public function __construct($codigo, $idEstado, $estado, $fechaAlta = null, $fechaModificacion = null, $fechaBaja = null, $id = null) {
         $this->id = $id;
         $this->codigo = $codigo;
         $this->idEstado = $idEstado;
@@ -20,31 +20,78 @@ class Mesa implements JsonSerializable
 
     }
 
-    
+    private static function EjecutarQueryInsertar($consulta, $cliente) {
+        $consulta->bindValue(':codigo', $this->codigo, PDO::PARAM_STR);
+        $consulta->bindValue(':idEstado', $this->idEstado, PDO::PARAM_INT);
+
+        $consulta->execute();
+    }
 
     public function CrearMesa()
     {
         $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
-        $query = 'INSERT INTO mesas (codigo,idEstado,baja) VALUES (:codigo,:idEstado,:baja)';
+        $query = 'INSERT INTO mesas (codigo,idEstado,fechaAlta) VALUES (:codigo,:idEstado,:fechaAlta)';
         $consulta = $objetoAccesoDato->RetornarConsulta($query);
-        $consulta->bindValue(':codigo', $this->codigo, PDO::PARAM_STR);
-        $consulta->bindValue(':idEstado', $this->idEstado, PDO::PARAM_INT);
-        $consulta->bindValue(':baja', $this->baja, PDO::PARAM_BOOL);
-        $consulta->execute();
-        return $objetoAccesoDato->RetornarUltimoIdInsertado();
+        
+        $fechaAlta = date('Y/m/d H:i:s', strtotime("now"));
+        $this->fechaAlta = new DateTime($fechaAlta);
+        $consulta->bindValue(':fechaAlta', $fechaAlta, PDO::PARAM_STR);
+
+        self::EjecutarQueryInsertar($consulta, $this);
+        $this->id = $objetoAccesoDato->RetornarUltimoIdInsertado();
+        return $this->id;
     }
 
     public function ModificarMesa()
     {
         $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
-        $query = 'UPDATE mesas SET codigo = :codigo, idEstado = :idEstado, baja = :baja WHERE id = :id';
+        $query = 'UPDATE mesas SET codigo = :codigo, idEstado = :idEstado, fechaModificacion = :fechaModificacion WHERE id = :id';
         $consulta = $objetoAccesoDato->RetornarConsulta($query);
+
+        $fechaModificacion = date('Y/m/d H:i:s', strtotime("now"));
+        $this->fechaModificacion = new DateTime($fechaModificacion);
+        $consulta->bindValue(':fechaModificacion', $fechaModificacion, PDO::PARAM_STR);
         $consulta->bindValue(':id', $this->id, PDO::PARAM_INT);
-        $consulta->bindValue(':codigo', $this->codigo, PDO::PARAM_STR);
-        $consulta->bindValue(':idEstado', $this->idEstado, PDO::PARAM_INT);
-        $consulta->bindValue(':baja', $this->baja, PDO::PARAM_BOOL);
-        $consulta->execute();
+
+        self::EjecutarQueryInsertar($consulta, $this);
         return $objetoAccesoDato->RetornarUltimoIdInsertado();
+    }
+
+    private static function FetchQueryGetAll($consulta) {
+        
+        $consulta->bindColumn('id', $id, PDO::PARAM_INT);
+        $consulta->bindColumn('codigo', $codigo, PDO::PARAM_STR);
+        $consulta->bindColumn('idEstado', $idEstado, PDO::PARAM_INT);
+        $consulta->bindColumn('estado', $estado, PDO::PARAM_STR);
+        $consulta->bindColumn('fechaAlta', $fechaAlta, PDO::PARAM_STR);
+        $consulta->bindColumn('fechaModificacion', $fechaModificacion, PDO::PARAM_STR);
+        $consulta->bindColumn('fechaBaja', $fechaBaja, PDO::PARAM_STR);
+
+        $mesa = null;
+        $mesas = [];
+        while ($fila = $consulta->fetch(PDO::FETCH_BOUND)) {
+            $mesa = new Mesa($codigo, $idEstado, $estado, $fechaAlta, $fechaModificacion, $fechaBaja, $id);
+            array_push($mesas, $mesa);
+        }
+        return $mesas;
+    }
+
+    private static function FetchQueryGet($consulta) {
+        $consulta->bindColumn('id', $id, PDO::PARAM_INT);
+        $consulta->bindColumn('codigo', $codigo, PDO::PARAM_STR);
+        $consulta->bindColumn('idEstado', $idEstado, PDO::PARAM_INT);
+        $consulta->bindColumn('estado', $estado, PDO::PARAM_STR);
+        $consulta->bindColumn('fechaAlta', $fechaAlta, PDO::PARAM_STR);
+        $consulta->bindColumn('fechaModificacion', $fechaModificacion, PDO::PARAM_STR);
+        $consulta->bindColumn('fechaBaja', $fechaBaja, PDO::PARAM_STR);
+
+        $mesa = null;
+
+        if ($consulta->fetch(PDO::FETCH_BOUND)) {
+            $mesa = new Mesa($codigo, $idEstado, $estado, $fechaAlta, $fechaModificacion, $fechaBaja, $id);
+        }
+        
+        return $mesa;
     }
 
     public static function GetMesas()
@@ -55,19 +102,7 @@ class Mesa implements JsonSerializable
         $consulta = $objetoAccesoDato->RetornarConsulta($query);
         $consulta->execute();
 
-        $consulta->bindColumn('id', $id, PDO::PARAM_INT);
-        $consulta->bindColumn('codigo', $codigo, PDO::PARAM_STR);
-        $consulta->bindColumn('idEstado', $idEstado, PDO::PARAM_INT);
-        $consulta->bindColumn('estado', $estado, PDO::PARAM_STR);
-        $consulta->bindColumn('baja', $baja, PDO::PARAM_BOOL);
-
-        $mesa = null;
-        $mesas = [];
-        while ($fila = $consulta->fetch(PDO::FETCH_BOUND)) {
-            $mesa = new Mesa($codigo, $idEstado, $estado, $baja, $id);
-            array_push($mesas, $mesa);
-        }
-        return $mesas;
+        return self::FetchQueryGetAll($consulta);
     }
     
     public static function GetMesa($id)
@@ -79,19 +114,7 @@ class Mesa implements JsonSerializable
         $consulta->bindValue(':id', $id, PDO::PARAM_INT);
         $consulta->execute();
         
-        $consulta->bindColumn('id', $id, PDO::PARAM_INT);
-        $consulta->bindColumn('codigo', $codigo, PDO::PARAM_STR);
-        $consulta->bindColumn('idEstado', $idEstado, PDO::PARAM_INT);
-        $consulta->bindColumn('estado', $estado, PDO::PARAM_STR);
-        $consulta->bindColumn('baja', $baja, PDO::PARAM_BOOL);
-
-        $mesa = null;
-
-        if ($consulta->fetch(PDO::FETCH_BOUND)) {
-            $mesa = new Mesa($codigo, $idEstado, $estado, $baja, $id);
-        }
-        
-        return $mesa;
+        return self::FetchQueryGet($consulta);
     }
 
     public static function GetMesaPorCodigo($codigo)
@@ -103,19 +126,7 @@ class Mesa implements JsonSerializable
         $consulta->bindValue(':codigo', $codigo, PDO::PARAM_STR);
         $consulta->execute();
         
-        $consulta->bindColumn('id', $id, PDO::PARAM_INT);
-        $consulta->bindColumn('codigo', $codigo, PDO::PARAM_STR);
-        $consulta->bindColumn('idEstado', $idEstado, PDO::PARAM_INT);
-        $consulta->bindColumn('estado', $estado, PDO::PARAM_STR);
-        $consulta->bindColumn('baja', $baja, PDO::PARAM_BOOL);
-
-        $mesa = null;
-
-        if ($consulta->fetch(PDO::FETCH_BOUND)) {
-            $mesa = new Mesa($codigo, $idEstado, $estado, $baja, $id);
-        }
-        
-        return $mesa;
+        return self::FetchQueryGet($consulta);
     }
     public static function GetMesasPorEstado($idEstado)
     {
@@ -126,19 +137,7 @@ class Mesa implements JsonSerializable
         $consulta->bindValue(':idEstado', $idEstado, PDO::PARAM_INT);
         $consulta->execute();
 
-        $consulta->bindColumn('id', $id, PDO::PARAM_INT);
-        $consulta->bindColumn('codigo', $codigo, PDO::PARAM_STR);
-        $consulta->bindColumn('idEstado', $idEstado, PDO::PARAM_INT);
-        $consulta->bindColumn('estado', $estado, PDO::PARAM_STR);
-        $consulta->bindColumn('baja', $baja, PDO::PARAM_BOOL);
-
-        $mesa = null;
-        $mesas = [];
-        while ($fila = $consulta->fetch(PDO::FETCH_BOUND)) {
-            $mesa = new Mesa($codigo, $idEstado, $estado, $baja, $id);
-            array_push($mesas, $mesa);
-        }
-        return $mesas;
+        return self::FetchQueryGetAll($consulta);
     }
     
     public function jsonSerialize(){

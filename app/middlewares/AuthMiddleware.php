@@ -1,14 +1,15 @@
 <?php
 
 require_once './utils/AutentificadorJWT.php';
+require_once './utils/BaseRespuestaError.php';
 
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Psr\Http\Server\RequestHandlerInterface as RequestHandler;
 use Slim\Psr7\Response;
 
-class AuthMiddleware
+class AuthMiddleware extends BaseRespuestaError
 {
-    private $_roles = [
+    private $_rolesValidos = [
         'socio' => 1,
         'bartender' => 2,
         'cervecero' => 3,
@@ -16,7 +17,13 @@ class AuthMiddleware
         'mozo' => 5,
         'cliente' => 6,
     ];
+    private $_roles = [];
+    private $_verificarRol;
 
+    function __construct(...$roles) {
+        $this->_roles = $roles;
+        $this->_verificarRol = count($this->_roles) > 0;
+    }
     /**
      * Example middleware invokable class
      *
@@ -27,115 +34,38 @@ class AuthMiddleware
      */
     public function __invoke(Request $request, RequestHandler $handler): Response
     {
-        $header = $request->getHeaderLine('Authorization');
-        $token = trim(explode("Bearer", $header)[1]);
-        $response = null;
+        
         try {
+            $header = $request->getHeaderLine('Authorization');
+            if (empty($header)) {
+                return self::RespuestaError(401, 'El token esta vacio.');
+            }
+            $token = trim(explode("Bearer", $header)[1]);
             AutentificadorJWT::VerificarToken($token);
-            $response = $handler->handle($request);
+            if ($this->_verificarRol) {
+                $data = AutentificadorJWT::ObtenerData($token);
+                if ($data->rol !== $this->_cliente && $data->rol !== $this->_vendedor) {
+                    return self::RespuestaError(401, 'Rol invalido: '.$data->rol);
+                }
+                foreach ($this->_roles as $rol) {
+                    $rol = strtolower($rol);
+                    if ($data->rol === $rol && array_search($rol, $this->_rolesValidos) !== false) {
+                        $estaAutorizado = true;
+                        break;
+                    }
+                }
+                if (!$estaAutorizado) {
+                    return self::RespuestaError(401, 'Usuario no autorizado: '.$data->rol);
+                }
+            }
+            
         } catch (Exception $e) {
-            $response = new Response();
-            $payload = json_encode(['error' => 'Hubo un error con el TOKEN']);
-            $response->getBody()->write($payload);
-            $response = $response->withStatus(401);
-
+            return self::RespuestaError(401, 'Hubo un error con el token');
         }
+        $response = $handler->handle($request);
         return $response->withHeader('Content-Type', 'application/json');
     }
 
-    private static function GetRol(Request $request) {
-        $header = $request->getHeaderLine('Authorization');
-        $token = trim(explode("Bearer", $header)[1]);
-        //var_dump($header);
-        $data = AutentificadorJWT::ObtenerData($token);
-        
-        return $data;
-    }
-    private static function RespuestaNoAutorizado() {
-        $response = new Response();
-        $payload = json_encode(['error' => 'Usuario no autorizado']);
-        $response->getBody()->write($payload);
-        $response = $response->withStatus(401);
-        $response = $response->withHeader('Content-Type', 'application/json');
-        return $response;
-    }
-    private static function ManejarRespuesta($noEstaAutorizado, Request $request, RequestHandler $handler) {
-        $response = $noEstaAutorizado ? self::RespuestaNoAutorizado() : $handler->handle($request);
-        return $response;
-    }
-    //probar
-    public function RechazarCliente(Request $request, RequestHandler $handler): Response {
-
-        $rol = self::GetRol($request);
-        //var_dump($rol);
-        return self::ManejarRespuesta($rol === $this->_roles['cliente'], $request, $handler);
-    }
-
-    public function RechazarSocio(Request $request, RequestHandler $handler): Response {
-
-        $rol = self::GetRol();
-        return self::ManejarRespuesta($rol === $this->_roles['socio'], $request, $handler);
-    }
-
-    public function RechazarBartender(Request $request, RequestHandler $handler): Response {
-
-        $rol = self::GetRol();
-        return self::ManejarRespuesta($rol === $this->_roles['bartender'], $request, $handler);
-    }
-
-    public function RechazarCervecero(Request $request, RequestHandler $handler): Response {
-
-        $rol = self::GetRol();
-        return self::ManejarRespuesta($rol === $this->_roles['cervecero'], $request, $handler);
-    }
-
-    public function RechazarCocinero(Request $request, RequestHandler $handler): Response {
-
-        $rol = self::GetRol();
-        return self::ManejarRespuesta($rol === $this->_roles['cocinero'], $request, $handler);
-    }
-
-    public function RechazarMozo(Request $request, RequestHandler $handler): Response {
-
-        $rol = self::GetRol();
-        return self::ManejarRespuesta($rol === $this->_roles['mozo'], $request, $handler);
-    }
-
-    public function AutorizarCliente(Request $request, RequestHandler $handler): Response {
-
-        $rol = self::GetRol();
-        return self::ManejarRespuesta($rol !== $this->_roles['cliente'] && $rol !== $this->_roles['socio'], $request, $handler);
-    }
-
-    public function AutorizarSocio(Request $request, RequestHandler $handler): Response {
-
-        $rol = self::GetRol();
-        return self::ManejarRespuesta($rol !== $this->_roles['socio'], $request, $handler);
-    }
-
-    public function AutorizarBartender(Request $request, RequestHandler $handler): Response {
-
-        $rol = self::GetRol();
-        return self::ManejarRespuesta($rol !== $this->_roles['bartender'] && $rol !== $this->_roles['socio'], $request, $handler);
-    }
-
-    public function AutorizarCervecero(Request $request, RequestHandler $handler): Response {
-
-        $rol = self::GetRol();
-        return self::ManejarRespuesta($rol !== $this->_roles['cervecero'] && $rol !== $this->_roles['socio'], $request, $handler);
-    }
-
-    public function AutorizarCocinero(Request $request, RequestHandler $handler): Response {
-
-        $rol = self::GetRol();
-        return self::ManejarRespuesta($rol !== $this->_roles['cocinero'] && $rol !== $this->_roles['socio'], $request, $handler);
-    }
-
-    public function AutorizarMozo(Request $request, RequestHandler $handler): Response {
-
-        $rol = self::GetRol();
-        return self::ManejarRespuesta($rol !== $this->_roles['mozo'] && $rol !== $this->_roles['socio'], $request, $handler);
-    }
 }
 
 ?>

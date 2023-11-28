@@ -45,7 +45,7 @@ class TipoProducto {
         $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
         $query = 'SELECT id, nombre FROM tiposDeProducto WHERE id = :id';
         $consulta = $objetoAccesoDato->RetornarConsulta($query);
-        $consulta->bindValue(':id', $nombre, PDO::PARAM_INT);
+        $consulta->bindValue(':id', $id, PDO::PARAM_INT);
         $consulta->execute();
         
         $consulta->bindColumn('id', $id, PDO::PARAM_INT);

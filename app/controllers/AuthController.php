@@ -24,7 +24,7 @@ class AuthController {
         if (!isset($parametros['rol'])) {
             throw new HttpBadRequestException($req, 'Debe enviar el rol');   
         }
-        
+        //agregar id
         $puesto = Puesto::GetPuestoPorNombre($parametros['rol']);
         if (!isset($puesto)) {
             throw new HttpBadRequestException($req, 'Rol invalido');       
