@@ -28,11 +28,11 @@ class Producto implements JsonSerializable
 
     }
 
-    private static function EjecutarQueryInsertar($consulta, $cliente) {
-        $consulta->bindValue(':nombre', $this->nombre, PDO::PARAM_STR);
-        $consulta->bindValue(':precio', $this->precio, PDO::PARAM_STR);
-        $consulta->bindValue(':stock', $this->stock, PDO::PARAM_INT);
-        $consulta->bindValue(':idTipoProducto', $this->idTipoProducto, PDO::PARAM_INT);
+    private static function EjecutarQueryInsertar($consulta, $producto) {
+        $consulta->bindValue(':nombre', $producto->nombre, PDO::PARAM_STR);
+        $consulta->bindValue(':precio', $producto->precio, PDO::PARAM_STR);
+        $consulta->bindValue(':stock', $producto->stock, PDO::PARAM_INT);
+        $consulta->bindValue(':idTipoProducto', $producto->idTipoProducto, PDO::PARAM_INT);
 
         $consulta->execute();
     }
@@ -82,6 +82,8 @@ class Producto implements JsonSerializable
             $producto = new Producto($nombre, floatval($precio), $stock, $idTipoProducto, $tipo, $fechaAlta, $fechaModificacion, $fechaBaja, $id);
             array_push($productos, $producto);
         }
+
+        return $productos;
     }
 
     private static function FetchQueryGet($consulta) {
@@ -107,7 +109,7 @@ class Producto implements JsonSerializable
     public static function GetProductos()
     {
         $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
-        $query = 'SELECT p.*, t.nombre AS tipo FROM productos p LEFT JOIN tiposDeProducto t ON p.idTipoProducto = t.id WHERE p.baja = 0';
+        $query = 'SELECT p.*, t.nombre AS tipo FROM productos p LEFT JOIN tiposDeProducto t ON p.idTipoProducto = t.id WHERE p.fechaBaja IS NULL';
 
         $consulta = $objetoAccesoDato->RetornarConsulta($query);
         $consulta->execute();
@@ -119,7 +121,7 @@ class Producto implements JsonSerializable
     public static function GetProducto($id)
     {
         $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
-        $query = 'SELECT p.*, t.nombre AS tipo FROM productos p LEFT JOIN tiposDeProducto t ON p.idTipoProducto = t.id WHERE p.id = :id AND p.baja = 0';
+        $query = 'SELECT p.*, t.nombre AS tipo FROM productos p LEFT JOIN tiposDeProducto t ON p.idTipoProducto = t.id WHERE p.id = :id AND p.fechaBaja IS NULL';
 
         $consulta = $objetoAccesoDato->RetornarConsulta($query);
         $consulta->bindValue(':id', $id, PDO::PARAM_INT);
@@ -131,7 +133,7 @@ class Producto implements JsonSerializable
     public static function GetProductoPorNombre($strNombre)
     {
         $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
-        $query = 'SELECT p.*, t.nombre AS tipo FROM productos p LEFT JOIN tiposDeProducto t ON p.idTipoProducto = t.id WHERE p.nombre = :nombre AND p.baja = 0';
+        $query = 'SELECT p.*, t.nombre AS tipo FROM productos p LEFT JOIN tiposDeProducto t ON p.idTipoProducto = t.id WHERE p.nombre = :nombre AND p.fechaBaja IS NULL';
 
         $consulta = $objetoAccesoDato->RetornarConsulta($query);
         $consulta->bindValue(':nombre', $strNombre, PDO::PARAM_STR);
@@ -143,7 +145,7 @@ class Producto implements JsonSerializable
     public static function GetProductosPorIdTipo($idTipo)
     {
         $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
-        $query = 'SELECT p.*, t.nombre AS tipo FROM productos p LEFT JOIN tiposDeProducto t ON p.idTipoProducto = t.id WHERE t.id = :tipo AND p.baja = 0';
+        $query = 'SELECT p.*, t.nombre AS tipo FROM productos p LEFT JOIN tiposDeProducto t ON p.idTipoProducto = t.id WHERE t.id = :tipo AND p.fechaBaja IS NULL';
         $consulta = $objetoAccesoDato->RetornarConsulta($query);
         $consulta->bindValue(':tipo', $idTipo, PDO::PARAM_INT);
         $consulta->execute();
@@ -154,12 +156,25 @@ class Producto implements JsonSerializable
     public static function GetProductosPorStrTipo($strTipo)
     {
         $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
-        $query = 'SELECT p.*, t.nombre AS tipo FROM productos p LEFT JOIN tiposDeProducto t ON p.idTipoProducto = t.id WHERE t.nombre = :tipo AND p.baja = 0';
+        $query = 'SELECT p.*, t.nombre AS tipo FROM productos p LEFT JOIN tiposDeProducto t ON p.idTipoProducto = t.id WHERE t.nombre = :tipo AND p.fechaBaja IS NULL';
         $consulta = $objetoAccesoDato->RetornarConsulta($query);
         $consulta->bindValue(':tipo', $strTipo, PDO::PARAM_STR);
         $consulta->execute();
 
         return self::FetchQueryGetAll($consulta);
+    }
+
+    public static function BajaProducto($id) {
+        $fechaBaja = date('Y/m/d H:i:s',strtotime("now"));
+        $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
+        $query = 'UPDATE productos SET fechaBaja = :fechaBaja WHERE id = :id';
+
+        $consulta = $objetoAccesoDato->RetornarConsulta($query);
+        $consulta->bindValue(':id', $id, PDO::PARAM_INT);
+        $consulta->bindValue(':fechaBaja', $fechaBaja, PDO::PARAM_STR);
+        $consulta->execute();
+
+        return $fechaBaja;
     }
 
     public static function ToCsvArray($productos) {
@@ -183,11 +198,51 @@ class Producto implements JsonSerializable
         
     }
 
-    public static function ToProducto($csvProducto) {
-        $p = fgetcsv($csvProducto);
-        $producto = new Producto($p[1], $p[2], $p[3], $p[4], $p[5], $p[6], $p[7], $p[8], $p[0]);
+    public function GetFechaAlta() {
+        return isset($this->fechaAlta) ? $this->fechaAlta->format('Y/m/d H:i:s') : null;
+    }
+    public function GetFechaModificacion() {
+        return isset($this->fechaModificacion) ? $this->fechaModificacion->format('Y/m/d H:i:s') : null;
+    }
+    public function GetFechaBaja() {
+        return isset($this->fechaBaja) ? $this->fechaBaja->format('Y/m/d H:i:s') : null;
+    }
+    public function ToCsvLine() {
+        $fechaAlta = $this->GetFechaAlta();
+        $fechaModificacion = $this->GetFechaModificacion();
+        $fechaBaja = $this->GetFechaBaja();
+        return "$this->nombre,$this->precio,$this->stock,$this->idTipoProducto,$this->tipoProducto,$fechaAlta,$fechaModificacion,$fechaBaja,$this->id";
+    }
+
+    //ya le estaria pasando el stream con getStream()
+    public static function ParsearCsv($ruta, $tieneTitulos = false) {
+
+        $productos = [];
+        $producto = null;
+        $p = null;
+        $file = fopen($ruta,"r");
+        $flagTitulos = false;
         
-        return $producto;
+        while(!feof($file))
+        {
+            
+            $p = fgetcsv($file);
+            if ($tieneTitulos && !$flagTitulos) {
+                $flagTitulos = true;
+                continue;
+            }
+            //var_dump($p);
+            if ($p !== false && $p !== null) {
+                $fechaAlta = (isset($p[5]) || empty($p[5])) ? null : $p[5];
+                $fechaModificacion = (isset($p[6]) || empty($p[6])) ? null : $p[6];
+                $fechaBaja = (isset($p[7]) || empty($p[7])) ? null : $p[7];
+                $id = (isset($p[8]) || empty($p[8])) ? null : $p[8];
+                $producto = new Producto($p[0], $p[1], $p[2], $p[3], $p[4], $fechaAlta, $fechaModificacion, $fechaBaja, $id);
+                array_push($productos, $producto);
+            }
+        }
+        fclose($file);
+        return $productos;
     }
 
     public function jsonSerialize(){

@@ -3,6 +3,10 @@
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Psr\Http\Server\RequestHandlerInterface as RequestHandler;
 use Slim\Psr7\Response;
+use Slim\Routing\RouteContext;
+use Slim\Exception\HttpException;
+use Slim\Exception\HttpBadRequestException;
+use Slim\Exception\HttpNotFoundException;
 
 class MesaMiddleware
 {
@@ -16,22 +20,7 @@ class MesaMiddleware
      */
     public function __invoke(Request $request, RequestHandler $handler): Response
     {   
-        // Fecha antes
-        $before = date('Y-m-d H:i:s');
-        
-        // Continua al controller
-        $response = $handler->handle($request);
-        $existingContent = json_decode($response->getBody());
-    
-        // Despues
-        $response = new Response();
-        $existingContent->fechaAntes = $before;
-        $existingContent->fechaDespues = date('Y-m-d H:i:s');
-        
-        $payload = json_encode($existingContent);
-
-        $response->getBody()->write($payload);
-        return $response->withHeader('Content-Type', 'application/json');
+        return $this->ControlarParametros($request, $handler);
     }
 
     private static function RespuestaError($codigo = 400, $error = 'Faltan parametros') {
@@ -53,6 +42,49 @@ class MesaMiddleware
         } else {
             $response = $handler->handle($request);
         }
+
+        return $response;
+    }
+
+    public function ControlarId(Request $request, RequestHandler $handler): Response {
+        $parametros = $request->getParsedBody();
+        $routeContext = RouteContext::fromRequest($request);
+        $route = $routeContext->getRoute();
+        $idArg = $route->getArgument('id');
+        $response = null;
+        $id = null;
+        if (isset($parametros['id'])) {
+            $id = $parametros['id'];
+        
+        } else if (isset($idArg)) {
+            $id = $idArg;
+        } else {
+            return self::RespuestaError(400, 'Debe enviar el id de la mesa');
+        }
+
+        if (!is_numeric($id) || str_contains($id, '.')) { 
+            return self::RespuestaError(400, 'El ID debe ser un numero');
+
+        }
+
+        $response = $handler->handle($request);
+
+        return $response;
+    }
+
+    public function ControlarMesaLibre(Request $request, RequestHandler $handler): Response {
+        $parametros = $request->getParsedBody();
+        
+        //validar que mesa este libre
+        $estadoMesaLibre = 5;
+        $mesa = Mesa::GetMesaPorCodigo($parametros['codigoMesa']);
+        if (!isset($mesa)) {
+            return self::RespuestaError(400, 'La mesa no existe');
+        }
+        if ( $mesa->idEstado !== $estadoMesaLibre ) {
+            return self::RespuestaError(400, 'La mesa esta ocupada');
+        }
+        $response = $handler->handle($request);
 
         return $response;
     }

@@ -34,8 +34,9 @@ class AuthMiddleware extends BaseRespuestaError
      */
     public function __invoke(Request $request, RequestHandler $handler): Response
     {
-        
+        $response = null;
         try {
+            $estaAutorizado = false;
             $header = $request->getHeaderLine('Authorization');
             if (empty($header)) {
                 return self::RespuestaError(401, 'El token esta vacio.');
@@ -44,24 +45,27 @@ class AuthMiddleware extends BaseRespuestaError
             AutentificadorJWT::VerificarToken($token);
             if ($this->_verificarRol) {
                 $data = AutentificadorJWT::ObtenerData($token);
-                if ($data->rol !== $this->_cliente && $data->rol !== $this->_vendedor) {
+                $rolValido = Puesto::GetPuestoPorNombre($data->rol);
+                if (!isset($rolValido)) {
                     return self::RespuestaError(401, 'Rol invalido: '.$data->rol);
                 }
+                
                 foreach ($this->_roles as $rol) {
                     $rol = strtolower($rol);
-                    if ($data->rol === $rol && array_search($rol, $this->_rolesValidos) !== false) {
+                    if ($data->rol === $rol) {
                         $estaAutorizado = true;
                         break;
                     }
                 }
                 if (!$estaAutorizado) {
-                    return self::RespuestaError(401, 'Usuario no autorizado: '.$data->rol);
+                    return self::RespuestaError(401, 'Usuario no autorizado: ' . $data->rol);
                 }
             }
             
         } catch (Exception $e) {
             return self::RespuestaError(401, 'Hubo un error con el token');
         }
+        
         $response = $handler->handle($request);
         return $response->withHeader('Content-Type', 'application/json');
     }

@@ -51,31 +51,23 @@ class EmpleadoController implements IController {
     public function Create(Request $req, Response $res, array $args = []) {
         $parametros = $req->getParsedBody();
 
-        if (!isset($parametros['nombre']) || !isset($parametros['apellido']) ||
-        !isset($parametros['dni']) ||!isset($parametros['puesto'])) {
-            throw new HttpBadRequestException($req, 'Debe enviar nombre, apellido, dni y puesto');
+        if (!isset($parametros['contrasenia']) || EsVacioONuloOEnBlanco($parametros['contrasenia'])) {
+            throw new HttpBadRequestException($req, 'Debe enviar contraseña');
         }
-        if (!is_numeric($parametros['dni'])) {
-            throw new HttpBadRequestException($req, 'DNI debe ser un numero');   
-        }
+        
         $puesto = Puesto::GetPuestoPorNombre($parametros['puesto']);
-        if (!isset($puesto)) {
-            throw new HttpBadRequestException($req, 'Debe enviar un puesto valido');
-            
-        }
+        
+        //($nombre, $apellido, $dni, $email, $idPuesto, $puesto, $contrasenia, $fechaAlta = null, $fechaModificacion = null, $fechaBaja = null, $id = null) {
+        $email = strtolower($parametros['email']);
 
-        $empleado = Empleado::GetEmpleadoPorDni($parametros['dni']);
-
-        if (isset($empleado)) {
-            throw new HttpBadRequestException($req, 'Empleado con dni '.$empleado->dni.' ya existe');
-        }
-
-        $empleado = new Empleado($parametros['nombre'], $parametros['apellido'], $parametros['dni'],$puesto->id, $puesto->nombre);
-        //var_dump($empleado);
+        $empleado = new Empleado($parametros['nombre'], $parametros['apellido'], $parametros['dni'], 
+        $email, $puesto->id, $puesto->nombre, $parametros['contrasenia']);
         
         $id = $empleado->CrearEmpleado();
-        $res->getBody()->write(json_encode(['mensaje' => 'Empleado creado', 'id' => $id]));
 
+        $payload = json_encode(['mensaje' => 'Empleado creado', 'id' => $id]);
+        $res->getBody()->write($payload);
+        
         return $res;
     }
 

@@ -15,36 +15,32 @@ class ProductoController implements IController {
 
 
     public function Get(Request $req, Response $res, array $args = []) {
-        if (!isset($args['id'])) {
-            throw new HttpBadRequestException($req, 'Debe enviar Id');   
-        }
+        
         $id = $args['id'];
-        if (!is_numeric($id)) {
-            throw new HttpBadRequestException($req, 'Id debe ser un numero');   
-        }
+        
         $producto = Producto::GetProducto($id);
         if (!isset($producto)) {
             throw new HttpNotFoundException($req, 'Producto no existe');   
         }
-        $res->getBody()->write(json_encode($producto));
+        $payload = json_encode($producto);
+        $res->getBody()->write($payload);
         return $res; 
     }
 
     public function GetAll(Request $req, Response $res, array $args = []) {
         $productos = Producto::GetProductos();
-        $res->getBody()->write(json_encode($productos));
+        $payload = json_encode($productos);
+        $res->getBody()->write($payload);
         return $res; 
     }
 
     public function GetAllPorCriterio(Request $req, Response $res, array $args = []) {
         if (!isset($args['tipoProducto'])) {
             throw new HttpBadRequestException($req, 'Debe enviar el tipo de producto');
-            
         }
         $tipoProducto = TipoProducto::GetTipoPorNombre($args['tipoProducto']);
         if (!isset($tipoProducto)) {
             throw new HttpBadRequestException($req, 'Tipo de producto invalido');
-            
         }
         $productos = Producto::GetProductosPorIdTipo($tipoProducto->id);
         $res->getBody()->write(json_encode($productos));
@@ -55,20 +51,9 @@ class ProductoController implements IController {
         $parametros = $req->getParsedBody();
         $codigo = generarCodigo(5);
 
-        if (!isset($parametros['nombre']) || !isset($parametros['precio']) ||
-        !isset($parametros['stock']) || !isset($parametros['tipoProducto'])
-        || !isset($parametros['minutosPreparacion'])) {
-            throw new HttpBadRequestException($req, 'Debe enviar nombre, precio, stock y tipo de producto');
-        }
         $tipoProducto = TipoProducto::GetTipoPorNombre($parametros['tipoProducto']);
-        if (!isset($tipoProducto)) {
-            throw new HttpBadRequestException($req, 'Tipo de producto invalido');
-            
-        }
 
-        if (!is_numeric($parametros['precio']) || !is_numeric($parametros['stock']) || !is_numeric($parametros['minutosPreparacion'])) {
-            throw new HttpBadRequestException($req, 'Precio y sotck debe ser numeros');
-        }
+        //($nombre, $precio, $stock, $idTipoProducto, $tipoProducto, $fechaAlta = null, $fechaModificacion = null, $fechaBaja = null, $id = null) {
 
         $producto = new Producto($parametros['nombre'], floatval($parametros['precio']), intval($parametros['stock']), $tipoProducto->id, $tipoProducto->nombre);
 
@@ -79,13 +64,9 @@ class ProductoController implements IController {
     }
 
     public function Delete(Request $req, Response $res, array $args = []) {
-        if (!isset($args['id'])) {
-            throw new HttpBadRequestException($req, 'Debe enviar Id del producto');   
-        }
+        
         $id = $args['id'];
-        if (!is_numeric($id)) {
-            throw new HttpBadRequestException($req, 'Id debe ser un numero');   
-        }
+        
         $producto = Producto::GetProducto($id);
         if (!isset($producto)) {
             throw new HttpNotFoundException($req, 'Producto no existe');   
@@ -99,21 +80,6 @@ class ProductoController implements IController {
     public function Update(Request $req, Response $res, array $args = []) {
         $parametros = $req->getParsedBody();
 
-        if (!isset($parametros['id']) || !isset($parametros['nombre']) || !isset($parametros['precio']) ||
-        !isset($parametros['stock']) || !isset($parametros['tipoProducto'])
-        || !isset($parametros['minutosPreparacion'])) {
-            throw new HttpBadRequestException($req, 'Debe enviar id, nombre, precio, stock y tipo de producto');
-        }
-        $tipoProducto = TipoProducto::GetTipoPorNombre($parametros['tipoProducto']);
-        if (!isset($tipoProducto)) {
-            throw new HttpBadRequestException($req, 'Tipo de producto invalido');
-            
-        }
-
-        if (!is_numeric($parametros['precio']) || !is_numeric($parametros['stock']) || !is_numeric($parametros['minutosPreparacion'])) {
-            throw new HttpBadRequestException($req, 'Precio y stock deben ser numeros');
-        }
-
         $producto = Producto::GetProducto(intval($parametros['id']));
         
         if (!isset($producto)) {
@@ -124,13 +90,63 @@ class ProductoController implements IController {
         $producto->stock = intval($parametros['stock']);
         $producto->idTipoProducto = $tipoProducto->id;
         $producto->tipoProducto = $tipoProducto->nombre;
-        $producto->minutosPreparacion = intval($parametros['minutosPreparacion']);
 
         $producto->ModificarProducto();
 
-        $res->getBody()->write(json_encode(['mensaje' => "Producto modificado"]));
+        $payload = json_encode(['mensaje' => "Producto modificado"]);
+        $res->getBody()->write($payload);
 
         return $res;
+    }
+
+    public function DescargarCsv(Request $req, Response $res, array $args = []) {
+        $nombreArchivo = 'productos.csv';
+        $productos = Producto::GetProductos();
+
+        $titulos = "nombre,precio,stock,idTipoProducto,tipoProducto,fechaAlta,fechaModificacion,fechaBaja,id";
+        //$res->getBody()->write($titulos) . PHP_EOL);
+
+        foreach ($productos as $producto) {
+            $res->getBody()->write($producto->ToCsvLine() . "\n");
+        }
+
+        return $res->withHeader('Content-Type', 'application/octet-stream')
+            ->withHeader('Content-Disposition', "attachment; filename=$nombreArchivo")
+            ->withAddedHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+            ->withHeader('Cache-Control', 'post-check=0, pre-check=0')
+            ->withHeader('Pragma', 'no-cache');
+            //->withBody((new \Slim\Psr7\Stream(fopen($nombreArchivo, 'rb'))));
+
+    }
+    
+    public function SubirCsv(Request $req, Response $res, array $args = []) {
+        $uploadedFiles = $req->getUploadedFiles();
+        $titulos = "nombre,precio,stock,idTipoProducto,tipoProducto,fechaAlta,fechaModificacion,fechaBaja,id";
+        
+        if (!isset($uploadedFiles['archivo']) || $uploadedFiles['archivo']->getError() !== UPLOAD_ERR_OK) {
+            throw new HttpBadRequestException($req, 'No se adjunto archivo de productos');
+        }
+        $ext = pathinfo($uploadedFiles['archivo']->getClientFilename(), PATHINFO_EXTENSION);
+        if ($ext !== 'csv') {
+            throw new HttpBadRequestException($req, 'La extensión incorrecta, solo se permiten archivos .csv');
+        }
+        try {
+            $uploadedFile = $uploadedFiles['archivo'];
+            $productos = Producto::ParsearCsv($uploadedFile->getFilePath());
+            foreach ($productos as $p) {
+                $p->CrearProducto();
+            }
+            $payload = json_encode(['mensaje' => 'Producto subidos']);
+
+            
+        } catch (\Exception $e) {
+            $payload = json_encode(['error' => 'Error al procesar el archivo, formato incorrecto']);
+            $res = $res->withStatus(400);
+        }
+
+        $res->getBody()->write($payload);
+        return $res;
+
     }
 }
 

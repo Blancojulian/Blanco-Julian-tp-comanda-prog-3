@@ -1,11 +1,16 @@
 <?php
 
+require_once './utils/AutentificadorJWT.php';
 require_once './models/Pedido.php';
 require_once './models/EstadoPedido.php';
+require_once './models/ItemPedido.php';
 require_once './models/Mesa.php';
 require_once './utils/utils.php';
-require_once './utils/Session.php';
 require_once './interfaces/IController.php';
+require_once './enums/EEstadosMesa.php';
+require_once './enums/EEstadosPedido.php';
+require_once './utils/BaseRespuestaError.php';
+
 
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Psr\Http\Message\ResponseInterface as Response;
@@ -13,9 +18,9 @@ use Slim\Exception\HttpException;
 use Slim\Exception\HttpBadRequestException;
 use Slim\Exception\HttpNotFoundException;
 
-class PedidoController implements IController {
+class PedidoController extends BaseRespuestaError implements IController {
 
-    private $_carpetaClientes = './Imagenes/ImagenesDePedidos/2023/';
+    private $_carpetaPedidos = './Imagenes/ImagenesDePedidos/2023/';
 
 
     public function Get(Request $req, Response $res, array $args = []) {
@@ -46,11 +51,10 @@ class PedidoController implements IController {
     }
 
     public function GetBebidasPendientes(Request $req, Response $res, array $args = []) {
-        echo $_ENV['CLAVE'];
-        echo 'hola';
+        
         $idTipoBebida = 1;
         $idEstadoPendiente = 1;
-        $pedidos = Pedido::GetPedidosPorTipoProducto($idTipoBebida, $idEstadoPendiente);
+        $pedidos = ItemPedido::GetItemsPorTipoProducto($idTipoBebida, $idEstadoPendiente);
         $payload = json_encode(["pedidos" => $pedidos]);
         $res->getBody()->write($payload);
 
@@ -61,7 +65,7 @@ class PedidoController implements IController {
         
         $idTipoComida = 2;
         $idEstadoPendiente = 1;
-        $pedidos = Pedido::GetPedidosPorTipoProducto($idTipoComida, $idEstadoPendiente);
+        $pedidos = ItemPedido::GetItemsPorTipoProducto($idTipoComida, $idEstadoPendiente);
         $payload = json_encode(["pedidos" => $pedidos]);
         $res->getBody()->write($payload);
 
@@ -72,10 +76,19 @@ class PedidoController implements IController {
         
         $idTipoCerveza = 3;
         $idEstadoPendiente = 1;
-        $pedidos = Pedido::GetPedidosPorTipoProducto($idTipoCerveza, $idEstadoPendiente);
+        $pedidos = ItemPedido::GetItemsPorTipoProducto($idTipoCerveza, $idEstadoPendiente);
         $payload = json_encode(["pedidos" => $pedidos]);
         $res->getBody()->write($payload);
 
+        return $res; 
+    }
+
+    public function GetProductosEncargados(Request $req, Response $res, array $args = []) {
+        $data = $this->GetDataFromRequest($req);
+        $items = ItemPedido::GetItemsPorIdEmpleado($data->id);
+        $payload = json_encode(["productos del empleado" => $items]);
+        $res->getBody()->write($payload);
+        
         return $res; 
     }
 
@@ -100,81 +113,58 @@ class PedidoController implements IController {
     //fecha de cheacion por cada item
     public function Create(Request $req, Response $res, array $args = []) {//ver si no habria que pedir el estado, si es una mesa nueva no deberia estar cerrada
         $parametros = $req->getParsedBody();
-        $uploadedFiles = $req->getUploadedFiles();
-        $uploadedFile = $uploadedFiles['imagen'];
+        $data = $this->GetDataFromRequest($req);//ver si esta bien hacer esto, o si tendria que mandar el idEmpleado por parametro
+        $idMozo = $data->id;
         $codigo = generarCodigo(5);
-        //parsear el array a un array de ItemPedido
         $itemsParseados = ItemPedido::ConvertirAArrayItems($parametros['items']);
 
         //validar estado del pedido
-        $estadoPendiente = 1;// estado inicial pendiente
-        $estado = EstadoPedido::GetEstadoPorId($estadoPendiente);
+        // estado inicial pendiente
+        $estado = EstadoPedido::GetEstadoPorId(EstadosPedido::EnPreparacion->value);
         if (!isset($estado)) {
-            throw new HttpBadRequestException($req); 
+            throw new HttpBadRequestException($req, 'No se encontro el estado pendiente'); 
         }
 
-        $estadoMesaClienteEsperando = 1;
         $mesa = Mesa::GetMesaPorCodigo($parametros['codigoMesa']);
         
         $pedido = new Pedido($codigo, $parametros['nombreCliente'],
-        $parametros['codigoMesa'], $estado->id, $estado->estado);
-        //echo 'tienmpo estimado';
-        //echo json_encode(['tiempo_estimado' => $pedido->tiempoEstimado]);
+        $parametros['codigoMesa'], $estado->id, $estado->estado, $idMozo);
         $pedido->items = $itemsParseados;
         $pedido->CalcularTotal();
         $id = $pedido->CrearPedido();
 
         ItemPedido::CrearItems($id, $pedido->items);//hacer if para comprobar si falla
         
-        $filename = FormatearNumero($pedido->id) . "$codigo-$pedido->codigoMesa.jpg";
-        moveUploadedFile($this->_carpetaPedido, $filename, $uploadedFile);
-        $pedido->SetArchivoImagen("$filename.jpg");
-
         //cambiar mesa a cliente esperando
-        $mesa->idEstado = $estadoMesaClienteEsperando;
+        $mesa->idEstado = EstadosMesa::ClienteEsperando->value;
         $mesa->ModificarMesa();
-        $res->getBody()->write(json_encode(['mensaje' => "Pedido creado", 'id' => $id, 'codigo' => $codigo]));
 
+        $payload = json_encode(['mensaje' => "Pedido creado", 'id' => $id, 'codigo' => $codigo]);
+        $res->getBody()->write($payload);
+        
         return $res;
     }
 
     public function Delete(Request $req, Response $res, array $args = []) {
-        if (!isset($args['id'])) {
-            throw new HttpBadRequestException($req);   
-        }
+        
         $id = $args['id'];
-        if (!is_numeric($id)) {
-            throw new HttpBadRequestException($req);   
-        }
         $pedido = Pedido::GetPedido($id);
         if (!isset($pedido)) {
             throw new HttpNotFoundException($req, 'Pedido no existe');   
         }
         $pedido->cancelado = true;
         $pedido->ModificarPedido();
-        $res->getBody()->write(json_encode(['mensaje' => "Pedido cancelado"]));
+        $payload = json_encode(['mensaje' => "Pedido cancelado"]);
+        $res->getBody()->write($payload);
         return $res; 
     }
     //ver
     //que el cocinero ingrese el tiempo de espera cuando se encargar del pedido
     //hay que comparar los viejos items y los nuevos, eliminar los que no estan y update los otros
+    //deberia pone el estado inicial en pendiente, en mas no se tendria que cambiar por update
     public function Update(Request $req, Response $res, array $args = []) {
         $parametros = $req->getParsedBody();
-        //$codigo = generarCodigo(5);
-        //var_dump($parametros);
-        if ( !isset($parametros['id']) || !isset($parametros['nombreCliente']) || !isset($parametros['codigoMesa']) ||
-        !isset($parametros['idEstado']) || !isset($parametros['items'])) {
-            throw new HttpBadRequestException($req, 'Debe enviar id, nombre del cliente, codigo mesa y los items');
-        }
-        //parsear el array a un array de ItemPedido
-        $itemsParseados = ItemPedido::ConvertirAArrayItems($parametros['items']);
-
-        //validar estado del pedido
-        $estado = EstadoPedido::GetEstadoPorId($parametros['idEstado']);
-        if (!isset($estado)) {
-            throw new HttpBadRequestException($req, 'Estado pedido invalido'); 
-        }
-
+    
         //validar que mesa este libre
         $estadoMesaLibre = 5;
         $mesaClienteEsperando = 1;
@@ -182,27 +172,23 @@ class PedidoController implements IController {
         if (!isset($mesa)) {
             throw new HttpBadRequestException($req, 'Mesa codigo '.$parametros['codigoMesa'].' no existe'); 
         }
-        /*
-        if ( $mesa->idEstado !== $estadoMesaLibre ) {
-            throw new HttpBadRequestException($req, 'La mesa esta ocupada'); 
-        }*/
 
         $pedido = Pedido::GetPedido(intval($parametros['id']));
-        if (isset($pedido)) {
-            throw new Exception("Error Processing Request", 1);
-            
-        }
+        
         $pedido->nombreCliente = $parametros['nombreCliente'];
         $pedido->codigoMesa = $parametros['codigoMesa'];
         $pedido->idEstado = $estado->id;
         $pedido->estado = $estado->estado;
-        $pedido->items = $itemsParseados;
-        $pedido->CalcularTotal();
+        if (isset($parametros['items'])) {
+            $itemsParseados = ItemPedido::ConvertirAArrayItems($parametros['items']);
+            $pedido->items = $itemsParseados;
+            $pedido->CalcularTotal();
+            ItemPedido::EliminarItems($pedido->id);
+            ItemPedido::CrearItems($pedido->id, $pedido->items);
+        }
 
         $pedido->ModificarPedido();
-        ItemPedido::EliminarItems($pedido->id);
-        ItemPedido::CrearItems($pedido->id, $pedido->items);
-
+        
         $pedido = new Pedido($codigo, $parametros['nombreCliente'],
         $parametros['codigoMesa'], $estado->id, $estado->estado);
 
@@ -212,99 +198,122 @@ class PedidoController implements IController {
         //cambiar mesa a cliente esperando
         $mesa->idEstado = $mesaClienteEsperando;
         $mesa->ModificarMesa();
-        $res->getBody()->write(json_encode(['mensaje' => "Pedido creado", 'id' => $id, 'codigo' => $codigo]));
+        $payload = json_encode(['mensaje' => "Pedido creado", 'id' => $id, 'codigo' => $codigo]);
+        $res->getBody()->write($payload);
 
         return $res;
     }
 
-    public function AtenderPedidoBebidas(Request $req, Response $res, array $args = []) {
+    public function AgregarImagen(Request $req, Response $res, array $args = []) {
         $parametros = $req->getParsedBody();
-        //validar tiempo estimado
-        $minutos = $parametros['minutosEstimado'];
-        $horaEstimada = new DateTime();
-        $horaEstimada->add(new DateInterval('PT'.$minutos.'M')); 
+
         $pedido = Pedido::GetPedido(intval($parametros['id']));
-
-        if (!isset($pedido->tiempoEstimado) || $horaEstimada > $pedido->tiempoEstimado) {
-            $pedido->tiempoEstimado = $horaEstimada;
+        if (!isset($pedido)) {
+            return self::RespuestaError(404, 'Pedido no existe');
         }
-
-        $idEstadoEnPreparacion = 2;
-        $estado = EstadoPedido::GetEstadoPorId($idEstadoEnPreparacion);
-        if (!isset($estado)) {
-            throw new HttpBadRequestException($req, 'Estado pedido invalido'); 
-        }
-
-        $pedido->idEstado = $estado->id;
-        $pedido->estado = $estado->estado;
-        $idTipoBebida = 1;
-        ItemPedido::SetEstadoItemsPorTipoProducto($pedido->id, $idEstadoEnPreparacion, $idTipoBebida);
-    
-        $res->getBody()->write(json_encode(['mensaje' => "Se estan preparando las bebidas"]));
-
-        return $res;
-    }
-    public function AtenderPedidoComidas(Request $req, Response $res, array $args = []) {
-        $parametros = $req->getParsedBody();
-        //validar tiempo estimado
-        $minutos = $parametros['minutosEstimado'];
-        $horaEstimada = new DateTime();
-        $horaEstimada->add(new DateInterval('PT'.$minutos.'M')); 
-        $pedido = Pedido::GetPedido(intval($parametros['id']));
-
-        if (!isset($pedido->tiempoEstimado) || $horaEstimada > $pedido->tiempoEstimado) {
-            $pedido->tiempoEstimado = $horaEstimada;
-        }
-
-        $idEstadoEnPreparacion = 2;
-        $estado = EstadoPedido::GetEstadoPorId($idEstadoEnPreparacion);
-        if (!isset($estado)) {
-            throw new HttpBadRequestException($req, 'Estado pedido invalido'); 
-        }
-
-        $pedido->idEstado = $estado->id;
-        $pedido->estado = $estado->estado;
-        $idTipoComida = 2;
-        ItemPedido::SetEstadoItemsPorTipoProducto($pedido->id, $idEstadoEnPreparacion, $idTipoComida);
-    
-        $res->getBody()->write(json_encode(['mensaje' => "Se estan preparando las bebidas"]));
-
-        return $res;
-    }
-    public function AtenderPedidoCervezas(Request $req, Response $res, array $args = []) {
-        $parametros = $req->getParsedBody();
-        //validar tiempo estimado
-        $minutos = $parametros['minutosEstimado'];
-        $horaEstimada = new DateTime();
-        $horaEstimada->add(new DateInterval('PT'.$minutos.'M')); 
-        $pedido = Pedido::GetPedido(intval($parametros['id']));
-
-        if (!isset($pedido->tiempoEstimado) || $horaEstimada > $pedido->tiempoEstimado) {
-            $pedido->tiempoEstimado = $horaEstimada;
-        }
-
-        $idEstadoEnPreparacion = 2;
-        $estado = EstadoPedido::GetEstadoPorId($idEstadoEnPreparacion);
-        if (!isset($estado)) {
-            throw new HttpBadRequestException($req, 'Estado pedido invalido'); 
-        }
-
-        $pedido->idEstado = $estado->id;
-        $pedido->estado = $estado->estado;
+        $uploadedFiles = $req->getUploadedFiles();
+        $uploadedFile = $uploadedFiles['imagen'];
+        $filename = FormatearNumero($pedido->id) . "$pedido->codigo-$pedido->codigoMesa.jpg";
+        moveUploadedFile($this->_carpetaPedidos, $filename, $uploadedFile);
+        $pedido->imagen = "$filename.jpg";
         $pedido->ModificarPedido();
-        $idTipoCerveza = 3;
-        ItemPedido::SetEstadoItemsPorTipoProducto($pedido->id, $idEstadoEnPreparacion, $idTipoCerveza);
-        
-        $res->getBody()->write(json_encode(['mensaje' => "Se estan preparando las bebidas"]));
+        $payload = json_encode(['mensaje' => "Se agreggo imagen al pedido $pedido->codigo"]);
+        $res->getBody()->write($payload);
 
         return $res;
     }
 
-    private static function TerminarPedido($idPedido) {
+
+    private function GetDataFromRequest(Request $request) {
+        $data = null;
+        $header = $request->getHeaderLine('Authorization');
+        if (!empty($header)) {
+            $token = trim(explode("Bearer", $header)[1]);
+            AutentificadorJWT::VerificarToken($token);
+            $data = AutentificadorJWT::ObtenerData($token);
+        }
+        return $data;
+    }
+    //este hay que pasar a un controller EstadoItem o hacer AtenderItems y TerminarItems
+    public function AtenderItems(Request $req, Response $res, array $args = []) {
+        $parametros = $req->getParsedBody();
+        $data = $this->GetDataFromRequest($req);//ver si esta bien hacer esto, o si tendria que mandar el idEmpleado por parametro
+        $items = [];
+        $item = null;
+        $minutos = null;
+        $horaEstimada = null;
+        $horaMaxima = null;
+        $idEstadoEnPreparacion = 2;
+
+        foreach ($parametros["items"] as $i) {
+
+            $item = ItemPedido::GetItem(intval($i['idItem']));
+
+            $minutos = $i['minutosEstimados'];
+            $horaEstimada = new DateTime();
+            $horaEstimada->add(new DateInterval('PT'.$minutos.'M'));
+            $item->tiempoEstimado = $horaEstimada;
+            $item->idEstado = $idEstadoEnPreparacion;
+            $item->idEmpleado = $data->id;
+            if ($horaMaxima == null || $horaEstimada > $horaMaxima) {
+                $horaMaxima = $horaEstimada;
+            }
+
+            ItemPedido::MofidicarItem(intval($parametros['idPedido']), $item);
+        }
+        
+        $pedido = Pedido::GetPedido(intval($parametros['idPedido']));
+        $pedido->idEstado = $idEstadoEnPreparacion;
+
+        if (!isset($pedido->tiempoEstimado) || $horaMaxima > $pedido->tiempoEstimado) {
+            $pedido->tiempoEstimado = $horaMaxima;
+        }
+
+        $pedido->ModificarPedido();
+        $payload = json_encode(['mensaje' => "Se estan preparando los items"]);
+        $res->getBody()->write($payload);
+
+        return $res;
+    }
+
+    public function TerminarItems(Request $req, Response $res, array $args = []) {
+        $parametros = $req->getParsedBody();
+        $items = [];
+        $item = null;
+        $minutos = null;
+        $horaEstimada = null;
+        $horaMaxima = null;
+        $idEstadoListoParaServir = 3;
+        $horaFinalizado = new DateTime();//date('Y/m/d H:i:s', strtotime("now"));
+
+
+        foreach ($parametros["items"] as $i) {
+
+            $item = ItemPedido::GetItem(intval($i['idItem']));
+
+            $item->horaFinalizado = $horaFinalizado;
+            $item->idEstado = $idEstadoListoParaServir;
+
+            ItemPedido::MofidicarItem(intval($parametros['idPedido']), $item);
+
+        }
+        
+        $pedido = Pedido::GetPedido(intval($parametros['idPedido']));
+        
+        $estaListoPedido = self::TerminarPedido($pedido->id, $horaFinalizado);
+        
+        $payload = json_encode(['mensaje' => "Se terminaron los item"]);
+        $res->getBody()->write($payload);
+
+        return $res;
+    }
+
+    
+    private static function TerminarPedido($idPedido, $horaFinalizado) {
         $pedido = Pedido::GetPedido(intval($idPedido));
         $estaListoPedido = true;
         $idEstadoListoParaServir = 3;
-        $estado = EstadoPedido::GetEstadoPorId($idEstadoListoParaServir);
+        //$estado = EstadoPedido::GetEstadoPorId($idEstadoListoParaServir);
 
         foreach ($pedido->items as $item) {
             if ($item->idEstado != $idEstadoListoParaServir) {
@@ -313,84 +322,89 @@ class PedidoController implements IController {
             }
         }
         if ($estaListoPedido) {
-            $pedido->idEstado = $estado->id;
-            $pedido->estado = $estado->estado;
+            $pedido->idEstado = $idEstadoListoParaServir;
+            $pedido->horaFinalizado = $horaFinalizado;
             $pedido->ModificarPedido();
         }
+        return $estaListoPedido;
     }
 
-    public function TerminarPedidoCervezas(Request $req, Response $res, array $args = []) {
+    public function PuntuarPedido(Request $req, Response $res, array $args = []) {
         $parametros = $req->getParsedBody();
-        $pedido = Pedido::GetPedido(intval($parametros['id']));
+        $arrayPuntajeItems = $parametros['puntajeItems'];
+        var_dump($arrayPuntajeItems);
+        $pedido = Pedido::GetPedidoPorCodigo($parametros['codigoPedido']);
+        //if (!isset($parametros['codigoPedido']) || !isset($parametros['codigoMesa']) || !isset($parametros['resenia']) || !isset($parametros['puntajeMesa']) || !isset($parametros['puntajeMozo']) || 
+        //!isset($parametros['puntajeItems']) || !is_array($parametros['puntajeItems']) || count($parametros['puntajeItems']) <= 0) {
+        
+        $pedido->resenia = $parametros['resenia'];
+        $pedido->puntajeMozo = intval($parametros['puntajeMozo']);
+        $pedido->puntajeMesa = intval($parametros['puntajeMesa']);
+        $pedido->puntajeMesa = intval($parametros['puntajeRestaurante']);
+        $pedido->ModificarPedido();
 
-        if (!isset($pedido)) {
-            throw new HttpBadRequestException($req, 'Pedido no existe'); 
+        $index = null;
+        foreach ($pedido->items as $item) {
+            $index = array_find_index(fn($i) => $i['idItem'] == $item->id, $arrayPuntajeItems);
+            if ($index != -1) {
+                $item->puntaje = intval($arrayPuntajeItems[$index]['puntaje']);
+                $item->MofidicarItem();
+            }
         }
-        $idEstadoListoParaServir = 3;
-        $estado = EstadoPedido::GetEstadoPorId($idEstadoListoParaServir);
-        if (!isset($estado)) {
-            throw new HttpBadRequestException($req, 'Estado pedido invalido'); 
-        }
-        
-        
-        $idTipoCerveza = 3;
-        ItemPedido::SetEstadoItemsPorTipoProducto($pedido->id, $idEstadoListoParaServir, $idTipoCerveza);
 
-        self::TerminarPedido($pedido->id);
-        
-        $res->getBody()->write(json_encode(['mensaje' => "Se estan preparando las bebidas"]));
+        $payload = json_encode(['mensaje' => "Encuesta recibida"]);
+        $res->getBody()->write($payload);
 
         return $res;
     }
 
-    public function TerminarPedidoBebidas(Request $req, Response $res, array $args = []) {
-        $parametros = $req->getParsedBody(); 
-        $pedido = Pedido::GetPedido(intval($parametros['id']));
+    public function ConsultarPedido(Request $req, Response $res, array $args = []) {
+        $parametros = $req->getQueryParams();
 
-        if (!isset($pedido)) {
-            throw new HttpBadRequestException($req, 'Pedido no existe'); 
+        if (!isset($parametros['codigoPedido']) || !isset($parametros['codigoMesa']) ||
+        EsVacioONuloOEnBlanco($parametros['codigoPedido']) || EsVacioONuloOEnBlanco($parametros['codigoMesa'])) {
+            return self::RespuestaError(400, 'Debe enviar codigo de pedido y codigo de mesa');
         }
-        $idEstadoListoParaServir = 3;
-        $estado = EstadoPedido::GetEstadoPorId($idEstadoListoParaServir);
-        if (!isset($estado)) {
-            throw new HttpBadRequestException($req, 'Estado pedido invalido'); 
-        }
-        
-        
-        $idTipoBebida = 1;
-        ItemPedido::SetEstadoItemsPorTipoProducto($pedido->id, $idEstadoListoParaServir, $idTipoBebida);
 
-        self::TerminarPedido($pedido->id);
-        
-        $res->getBody()->write(json_encode(['mensaje' => "Se estan preparando las bebidas"]));
+        $pedido = Pedido::GetPedidoPorCodigo($parametros['codigoPedido']);
+        if (!isset($pedido) || $pedido->codigoMesa != $parametros['codigoMesa']) {
+            return self::RespuestaError(404, 'Pedido no encontrado');
+        }
+        $ahora = new DateTime();
+        $estado = $ahora > $pedido->tiempoEstimado ? 'atrasado' : 'En preparación';
+        $payload = json_encode([
+            'horaEstimada' => $pedido->tiempoEstimado,
+            'tiempoRestante'=> CalcularTiempoRestante($pedido->tiempoEstimado),
+            'estado' => $estado
+        ]);
+        $res->getBody()->write($payload);
 
         return $res;
     }
-
-    public function TerminarPedidoComidas(Request $req, Response $res, array $args = []) {
-        $parametros = $req->getParsedBody();
-        $pedido = Pedido::GetPedido(intval($parametros['id']));
-
-        if (!isset($pedido)) {
-            throw new HttpBadRequestException($req, 'Pedido no existe'); 
-        }
-        $idEstadoListoParaServir = 3;
-        $estado = EstadoPedido::GetEstadoPorId($idEstadoListoParaServir);
-        if (!isset($estado)) {
-            throw new HttpBadRequestException($req, 'Estado pedido invalido'); 
-        }
-        
-        
-        $idTipoComida = 2;
-        ItemPedido::SetEstadoItemsPorTipoProducto($pedido->id, $idEstadoListoParaServir, $idTipoComida);
-
-        self::TerminarPedido($pedido->id);
-        
-        $res->getBody()->write(json_encode(['mensaje' => "Se estan preparando las bebidas"]));
+    
+    public function GetMejoresComentarios(Request $req, Response $res, array $args = []) {
+        $resenias = Pedido::GetPedidosPorPuntaje(7);
+        $payload = json_encode($resenias);
+        $res->getBody()->write($payload);
 
         return $res;
     }
+    
 
+    public function GetPedidosPorEntrega(Request $req, Response $res, array $args = []) {
+        $parametros = $req->getQueryParams();
+
+        if (!isset($parametros['filtro']) || ($parametros['filtro'] != 'fueraDeTiempo' && $parametros['filtro'] != 'enTermino')) {
+            return self::RespuestaError(400, 'Debe enviar filtro, fueraDeTiempo o enTermino');
+        }
+
+        $fueraDeTiempo = $parametros['filtro'] == 'fueraDeTiempo';
+        $pedidos = Pedido::GetPedidosPorEntrega($fueraDeTiempo);
+        $payload = json_encode($pedidos);
+        $res->getBody()->write($payload);
+
+        return $res;
+    }
     
 }
 

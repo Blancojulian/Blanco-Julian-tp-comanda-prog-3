@@ -36,5 +36,28 @@ function moveUploadedFile(string $directory, string $filename, $uploadedFile)//U
 function EsVacioONuloOEnBlanco($str) {
     return !isset($str) || empty(trim($str));
 }
+function EsNumeroEntero($num) {
+    return is_numeric($num) && !str_contains($num, '.');
+}
+
+function CalcularTiempoRestante(DateTime $fechaFinal) {
+
+    $ahora = new DateTime();
+    $intervalo = $ahora->diff($fechaFinal);
+    $formato = $intervalo->h != 0 ? '%HH:%IM:%sS' : '%IM:%sS';
+    
+    return $intervalo->format($formato);
+}
+
+function array_find_index($callback, $array) {
+    $index = -1;
+    foreach ($array as $key=>$value) {
+      if ($callback($value)) {
+        $index = $key;
+        break;
+      }
+    }
+    return $index;
+}
 
 ?>
