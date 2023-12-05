@@ -18,17 +18,17 @@ class ItemPedido implements JsonSerializable
     
     public function __construct($idProducto, $producto, $precioUnitario, $idTipoProducto, $idEstado, $estado, $idEmpleado = null, $tiempoEstimado = null, $horaFinalizado = null, $puntaje = null, $id = null) {
         
-        $this->idProducto = $idProducto;
+        $this->idProducto = intval($idProducto);
         $this->producto = $producto;
         $this->precioUnitario = floatval($precioUnitario);
-        $this->idTipoProducto = $idTipoProducto;
-        $this->idEstado = $idEstado;
+        $this->idTipoProducto = intval($idTipoProducto);
+        $this->idEstado = intval($idEstado);
         $this->estado = $estado;
-        $this->idEmpleado = $idEmpleado;
+        $this->idEmpleado = isset($idEmpleado) ? intval($idEmpleado) : null;
         $this->tiempoEstimado = $tiempoEstimado;
         $this->horaFinalizado = $horaFinalizado;
-        $this->puntaje = $puntaje;
-        $this->id = $id;
+        $this->puntaje = isset($puntaje) ? intval($puntaje) : null;
+        $this->id = isset($id) ? intval($id) : null;
 
     }
 
@@ -48,7 +48,7 @@ class ItemPedido implements JsonSerializable
         return isset($this->horaFinalizado) ? $this->horaFinalizado->format('Y/m/d H:i:s') : null;
     }
     private static function EjecutarQueryInsertar($consulta, $idPedido, $item) {
-        
+       
         $consulta->bindValue(':idPedido', intval($idPedido), PDO::PARAM_INT);
         $consulta->bindValue(':idProducto', $item->idProducto, PDO::PARAM_INT);
         $consulta->bindValue(':precioUnitario', $item->precioUnitario, PDO::PARAM_STR);//ver sino tirar error pq es float
@@ -57,7 +57,7 @@ class ItemPedido implements JsonSerializable
         $consulta->bindValue(':tiempoEstimado', $item->GetTiempoEstimado(), PDO::PARAM_STR);
         $consulta->bindValue(':horaFinalizado', $item->GetHoraFinalizado(), PDO::PARAM_STR);
         $consulta->bindValue(':puntaje', $item->puntaje, PDO::PARAM_INT);
-        echo 'ola';
+        
         
         $consulta->execute();
     }
@@ -84,6 +84,7 @@ class ItemPedido implements JsonSerializable
         tiempoEstimado = :tiempoEstimado, horaFinalizado = :horaFinalizado, 
         puntaje = :puntaje WHERE id = :id';
         $consulta = $objetoAccesoDato->RetornarConsulta($query);
+        $consulta->bindValue(':id', $item->id, PDO::PARAM_INT);
         self::EjecutarQueryInsertar($consulta, $idPedido, $item);
         
         return $objetoAccesoDato->RetornarUltimoIdInsertado();
