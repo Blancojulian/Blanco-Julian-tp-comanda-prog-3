@@ -3,6 +3,7 @@
 require_once './models/Empleado.php';
 require_once './models/Puesto.php';
 require_once './interfaces/IController.php';
+require_once './utils/BaseRespuestaError.php';
 
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Psr\Http\Message\ResponseInterface as Response;
@@ -10,7 +11,7 @@ use Slim\Exception\HttpException;
 use Slim\Exception\HttpBadRequestException;
 use Slim\Exception\HttpNotFoundException;
 
-class EmpleadoController implements IController {
+class EmpleadoController extends BaseRespuestaError implements IController {
 
     public function Get(Request $req, Response $res, array $args = []) {
         if (!isset($args['id'])) {
@@ -88,39 +89,40 @@ class EmpleadoController implements IController {
         return $res; 
     }
 
-    public function SuspenderEmpleado(Request $req, Response $res, array $args = []) {
+    public function SuspencionEmpleado(Request $req, Response $res, array $args = []) {
+        $parametros = $req->getQueryParams();
+
+        if (!isset($parametros['accion']) || ($parametros['accion'] !== 'suspender' && $parametros['accion'] !== 'habilitar')) {
+            throw new HttpBadRequestException($req, 'Debe enviar la accion, suspender o habilitar');   
+        }
+
         if (!isset($args['id'])) {
             throw new HttpBadRequestException($req, 'Debe enviar el id');   
         }
-        $id = $args['id'];
-        if (!is_numeric($id)) {
+        if (!is_numeric($args['id'])) {
             throw new HttpBadRequestException($req, 'Id debe ser un numero');   
         }
+        $id = $args['id'];
+        $suspender = $parametros['accion'] == 'suspender';
+        $mensaje = $suspender ? 'Empleado suspendido' : 'Empleado habilitado';
+        
         $empleado = Empleado::GetEmpleado($id);
         if (!isset($empleado)) {
             throw new HttpNotFoundException($req, 'Empleado no existe');   
         }
-        Empleado::SuspenderEmpleado($empleado->id);
-        $res->getBody()->write(json_encode(['mensaje' => "Empleado suspendido"]));
+        if ($suspender && isset($empleado->fechaSuspension)) {
+            throw new HttpNotFoundException($req, 'Empleado ya suspendido');   
+        } else if (!$suspender && !isset($empleado->fechaSuspension)) {
+            throw new HttpNotFoundException($req, 'Empleado esta habilitado');   
+        }
+
+        Empleado::SuspenderEmpleado($empleado->id, $suspender);
+        $payload = json_encode(['mensaje' => $mensaje]);
+        $res->getBody()->write($payload);
         return $res; 
+
     }
 
-    public function HabilitarEmpleado(Request $req, Response $res, array $args = []) {
-        if (!isset($args['id'])) {
-            throw new HttpBadRequestException($req, 'Debe enviar el id');   
-        }
-        $id = $args['id'];
-        if (!is_numeric($id)) {
-            throw new HttpBadRequestException($req, 'Id debe ser un numero');   
-        }
-        $empleado = Empleado::GetEmpleado($id);
-        if (!isset($empleado)) {
-            throw new HttpNotFoundException($req, 'Empleado no existe');   
-        }
-        Empleado::SuspenderEmpleado($empleado->id, false);
-        $res->getBody()->write(json_encode(['mensaje' => "Empleado suspendido"]));
-        return $res; 
-    }
 
     public function Update(Request $req, Response $res, array $args = []) {
         $parametros = $req->getParsedBody();

@@ -65,6 +65,7 @@ $customErrorHandler = function (
     $response->getBody()->write(
         json_encode($payload, JSON_UNESCAPED_UNICODE)
     );
+    $response = $response->withHeader('Content-Type', 'application/json');
     if ($exception instanceof HttpException) {
         $response = $response->withStatus($exception->getCode());
     } elseif ($exception instanceof PDOException) {
@@ -86,6 +87,7 @@ $app->get('[/]', function (Request $request, Response $response) {
 
 $app->group('/empleado', function (RouteCollectorProxy $group) {
     
+    $group->delete('/suspencion/{id}', \EmpleadoController::class . ':SuspencionEmpleado');
     $group->get('[/]', \EmpleadoController::class . ':GetAll');
     $group->get('/{id}', \EmpleadoController::class . ':Get')
     ->add(\EmpleadoMiddleware::class . ':ControlarId');
@@ -112,6 +114,7 @@ $app->group('/mesa', function (RouteCollectorProxy $group) {
     ->add(new LoggerMiddleware('Cobrar mesa'))
     ->add(new AuthMiddleware('mozo'));
     $group->post('/cerrar/{id}', \MesaController::class . ':CerrarMesa')
+    ->add(new LoggerMiddleware('Cerrar mesa'))
     ->add(new AuthMiddleware('socio'));
     $group->get('[/]', \MesaController::class . ':GetAll')
     ->add(new AuthMiddleware('socio'));
