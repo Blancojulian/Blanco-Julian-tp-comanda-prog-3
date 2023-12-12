@@ -260,23 +260,7 @@ class Pedido implements JsonSerializable
         
         return self::FetchQueryGetAll($consulta);
     }
-    //no usar ahora esta en encuesta
-    /*
-    public static function GetPedidosPorPuntaje($puntaje, $esMayor = true)
-    {
-        $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
-        $query = 'SELECT p.*, e.estado FROM pedidos p LEFT JOIN estadosPedido e ON p.idEstado = e.id WHERE p.fechaCancelacion IS NULL';
-        
-        $query .= $esMayor ? ' AND p.puntajeRestaurante > :puntaje' : ' AND p.puntajeRestaurante < :puntaje';
-        $query .= ' ORDER BY p.puntajeRestaurante DESC LIMIT 20'; 
-        $consulta = $objetoAccesoDato->RetornarConsulta($query);
-        $consulta->bindValue(':puntaje', $puntaje, PDO::PARAM_INT);
-        $consulta->execute();
-        
-        $pedidos = self::FetchQueryGetAll($consulta);
-        $resenias = array_map(fn($p) => $p->ToResenia(), $pedidos);
-        return $resenias;
-    }*/
+    
     //ya nose usa se enviar los items
     public static function GetPedidosPorTipoProducto($idTipoProducto, $idEstadoPedido = null)
     {
@@ -296,7 +280,6 @@ class Pedido implements JsonSerializable
         return self::FetchQueryGetAll($consulta);
     }
 //mesa mas usada
-//usar esto para el punto 21, lista de mesas de la que hizo la fc mas barata a la cara, usar max para ver su total mas alto
     public static function GetMesaConMasPedidos() {
         $retorno = null;
         $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
@@ -332,22 +315,6 @@ class Pedido implements JsonSerializable
         
         return self::FetchQueryGetAll($consulta);
     }
-
-
-    //ver si tendria que tener fecha de baja tambien
-    /*
-    public static function BajaPedido($id) {
-        $fechaBaja = date('Y/m/d H:i:s',strtotime("now"));
-        $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
-        $query = 'UPDATE pedidos SET fechaBaja = :fechaBaja WHERE id = :id';
-
-        $consulta = $objetoAccesoDato->RetornarConsulta($query);
-        $consulta->bindValue(':id', $id, PDO::PARAM_INT);
-        $consulta->bindValue(':fechaBaja', $fechaBaja, PDO::PARAM_STR);
-        $consulta->execute();
-
-        return $fechaBaja;
-    }*/
     
     public static function CancelarPedido($id) {
         $fechaCancelacion = date('Y/m/d H:i:s',strtotime("now"));

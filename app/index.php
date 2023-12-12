@@ -74,7 +74,7 @@ $customErrorHandler = function (
     return $response;
 };
 $errorMiddleware = $app->addErrorMiddleware(true, true, true);
-//$errorMiddleware->setDefaultErrorHandler($customErrorHandler);
+$errorMiddleware->setDefaultErrorHandler($customErrorHandler);
 
 $app->get('[/]', function (Request $request, Response $response) {    
     $payload = json_encode(["mensaje" => "Hola mundo"]);
@@ -82,8 +82,7 @@ $app->get('[/]', function (Request $request, Response $response) {
     var_dump($datos);
     $response->getBody()->write($payload);
     return $response->withHeader('Content-Type', 'application/json');
-})->add(\AuthMiddleware::class . ':PasarDatos');//->add(\LoggerMiddleware::class . ':LogIngreso');
-//->add(new LoggerMiddleware());
+});
 
 $app->group('/empleado', function (RouteCollectorProxy $group) {
     
@@ -152,7 +151,7 @@ $app->group('/producto', function (RouteCollectorProxy $group) {
 })
 ->add(new AuthMiddleware('socio'));
 
-$app->group('/pedido', function (RouteCollectorProxy $group) {//sacar campo precio unitario
+$app->group('/pedido', function (RouteCollectorProxy $group) {
     
     $group->post('/servir/{id}', \PedidoController::class . ':ServirPedido')
     ->add(new LoggerMiddleware('Servir mesa'))
@@ -191,7 +190,7 @@ $app->group('/pedido', function (RouteCollectorProxy $group) {//sacar campo prec
 
     $group->get('[/]', \PedidoController::class . ':GetAll')
     ->add(new AuthMiddleware('socio'));
-    $group->get('/{id}', \PedidoController::class . ':Get')//si se pone primero tapa las otras rutas
+    $group->get('/{id}', \PedidoController::class . ':Get')
     ->add(\PedidoMiddleware::class . ':ControlarId')
     ->add(new AuthMiddleware('socio', 'mozo'));
     $group->get('/criterio/{idEstado}', \PedidoController::class . ':GetAllPorCriterio')
@@ -212,7 +211,7 @@ $app->group('/pedido', function (RouteCollectorProxy $group) {//sacar campo prec
 
 });//->add(new AuthMiddleware());
 
-$app->group('/consulta', function (RouteCollectorProxy $group) {//sacar campo precio unitario
+$app->group('/consulta', function (RouteCollectorProxy $group) {
     $group->get('/mejores-comentarios[/]', \ConsultaController::class . ':GetMejoresComentarios');
     $group->get('/operaciones-por-sector[/]', \ConsultaController::class . ':GetOperacionesPorSector');
     $group->get('/operaciones-por-empleado[/]', \ConsultaController::class . ':GetOperacionesPorEmpleado');
