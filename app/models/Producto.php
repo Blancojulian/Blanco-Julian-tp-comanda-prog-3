@@ -164,6 +164,44 @@ class Producto implements JsonSerializable
         return self::FetchQueryGetAll($consulta);
     }
 
+    //funciona,ver porque devuelve producto que no se usaron
+    public static function GetProductosSegunVentas($segunMasVendido = true)
+    {
+        $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
+        $query = 'SELECT p.*, t.nombre AS tipo, COUNT(*) AS cantidad FROM productos p LEFT JOIN tiposDeProducto t ON p.idTipoProducto = t.id LEFT JOIN itemsPedido i ON p.id = i.idProducto LEFT JOIN pedidos pe ON i.idPedido = pe.id WHERE p.fechaBaja IS NULL AND pe.fechaCancelacion IS NULL GROUP BY p.id ORDER BY cantidad';
+        $query = 'SELECT p.*, t.nombre AS tipo, COUNT(i.idProducto) AS cantidad 
+        FROM productos p LEFT JOIN tiposDeProducto t ON p.idTipoProducto = t.id LEFT JOIN itemsPedido i ON 
+        p.id = i.idProducto LEFT JOIN pedidos pe ON i.idPedido = pe.id 
+        WHERE p.fechaBaja IS NULL AND pe.fechaCancelacion IS NULL 
+        GROUP BY p.id HAVING cantidad IS NOT NULL 
+        ORDER BY cantidad';
+        $query .= $segunMasVendido ? ' DESC' : ' ASC';
+        $consulta = $objetoAccesoDato->RetornarConsulta($query);
+        $consulta->execute();
+
+        $consulta->bindColumn('id', $id, PDO::PARAM_INT);
+        $consulta->bindColumn('nombre', $nombre, PDO::PARAM_STR);
+        $consulta->bindColumn('precio', $precio, PDO::PARAM_STR);//parsear a float
+        $consulta->bindColumn('stock', $stock, PDO::PARAM_INT);
+        $consulta->bindColumn('idTipoProducto', $idTipoProducto, PDO::PARAM_INT);
+        $consulta->bindColumn('tipo', $tipo, PDO::PARAM_STR);
+        $consulta->bindColumn('fechaAlta', $fechaAlta, PDO::PARAM_STR);
+        $consulta->bindColumn('fechaModificacion', $fechaModificacion, PDO::PARAM_STR);
+        $consulta->bindColumn('fechaBaja', $fechaBaja, PDO::PARAM_STR);
+
+        $consulta->bindColumn('cantidad', $cantidad, PDO::PARAM_INT);
+
+        $producto = null;
+        $productos = [];
+        while ($fila = $consulta->fetch(PDO::FETCH_BOUND)) {
+            $producto = new Producto($nombre, floatval($precio), $stock, $idTipoProducto, $tipo, $fechaAlta, $fechaModificacion, $fechaBaja, $id);
+            array_push($productos, ['cantidad_ventas' => $cantidad, 'producto' => $producto]);
+        }
+
+        return $productos;
+
+    }
+
     public static function BajaProducto($id) {
         $fechaBaja = date('Y/m/d H:i:s',strtotime("now"));
         $objetoAccesoDato = AccesoDatos::getObjetoAcceso();

@@ -147,6 +147,51 @@ class Mesa implements JsonSerializable
         return self::FetchQueryGetAll($consulta);
     }
 
+    public static function GetMesaTotalFacturadoPorFechas($codigoMesa, $fechaInicio, $fechaFinal)
+    {
+        $retorno = 0;
+        $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
+        $query = 'SELECT SUM(total) AS total_mesa FROM pedidos WHERE (DATE(fechaAlta) BETWEEN DATE(:fechaInicio) AND DATE(:fechaFinal)) AND idMesa = :idMesa AND fechaCancelacion IS NULL';
+        
+        $consulta = $objetoAccesoDato->RetornarConsulta($query);
+        $consulta->bindValue(':idMesa', $codigoMesa, PDO::PARAM_STR);
+        $consulta->bindValue(':fechaInicio', $fechaInicio, PDO::PARAM_STR);
+        $consulta->bindValue(':fechaFinal', $fechaFinal, PDO::PARAM_STR);
+        $consulta->execute();
+        $consulta->bindColumn('total_mesa', $total, PDO::PARAM_STR);
+
+        if ($consulta->fetch(PDO::FETCH_BOUND)) {
+            $retorno = floatval($total);
+        }
+
+        return $retorno;
+    }
+//punto 21, creo que listo, ver si se tendria que hacer la consulta con un inner join a pedidos
+    public static function GetMesasSegunFacturacion() {
+        $retorno = null;
+        $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
+        
+        $query = 'SELECT m.*, e.estado, MAX(p.total) AS totalMesa
+        FROM mesas m LEFT JOIN estadosMesa e ON m.idEstado = e.id LEFT JOIN pedidos p ON p.idMesa = m.id
+        WHERE p.fechaCancelacion IS NULL
+        GROUP BY m.id HAVING MAX(p.total) IS NOT NULL
+        ORDER BY totalMesa ASC';
+        $consulta = $objetoAccesoDato->RetornarConsulta($query);
+        $consulta->execute();
+        $consulta->bindColumn('totalMesa', $totalMesa, PDO::PARAM_STR);
+
+        $aux = self::BindColumns($consulta);
+
+        $mesa = null;
+        $mesas = [];
+        while ($fila = $consulta->fetch(PDO::FETCH_BOUND)) {
+            $mesa = new Mesa($aux->codigo, $aux->idEstado, $aux->estado, $aux->fechaAlta, $aux->fechaModificacion, $aux->fechaBaja, $aux->id);
+            array_push($mesas, ['facturado' => floatval($totalMesa), 'mesa' => $mesa]);
+        }
+        return $mesas;
+    }
+
+
     public static function BajaMesa($id) {
         $fechaBaja = date('Y/m/d H:i:s',strtotime("now"));
         $objetoAccesoDato = AccesoDatos::getObjetoAcceso();

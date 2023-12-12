@@ -71,8 +71,7 @@ class ProductoController implements IController {
         if (!isset($producto)) {
             throw new HttpNotFoundException($req, 'Producto no existe');   
         }
-        $producto->baja = true;
-        $producto->ModificarProducto();
+        Producto::BajaProducto($producto->id);
         $res->getBody()->write(json_encode(['mensaje' => "Producto eliminado"]));
         return $res; 
     }
@@ -148,6 +147,14 @@ class ProductoController implements IController {
         return $res;
 
     }
+
+    public function GetProductosSegunMasVentas(Request $req, Response $res, array $args = []) {
+        $productos = Producto::GetProductosSegunVentas();
+        $payload = json_encode($productos);
+        $res->getBody()->write($payload);
+        return $res; 
+    }
+
 }
 
 ?>

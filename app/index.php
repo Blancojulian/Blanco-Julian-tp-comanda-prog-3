@@ -16,7 +16,6 @@ use Selective\BasePath\BasePathDetector;
 use Slim\Views\PhpRenderer;
 use Slim\Routing\RouteCollectorProxy;
 use Psr\Log\LoggerInterface;
-use TCPDF\TCPDF;
 
 require __DIR__ . '/../vendor/autoload.php';
 require_once './controllers/EmpleadoController.php';
@@ -25,6 +24,7 @@ require_once './controllers/ProductoController.php';
 require_once './controllers/PedidoController.php';
 require_once './controllers/LoginController.php';
 require_once './controllers/AuthController.php';
+require_once './controllers/ConsultaController.php';
 require_once './controllers/PdfController.php';
 require_once './middlewares/LoggerMiddleware.php';
 require_once './middlewares/ImagenMiddleware.php';
@@ -46,9 +46,7 @@ $app->setBasePath('/Blanco-Julian-tp-comanda-prog-3/app');
 $app->addBodyParsingMiddleware();
 $app->addRoutingMiddleware();
 //$app->set('upload_directory', __DIR__ . '/uploads');
-//hash m5
-//https://www.php.net/manual/en/function.password-hash.php
-//agregar fecha alta modificacion, baja
+
 $customErrorHandler = function (
     Request $request,
     Throwable $exception,
@@ -78,21 +76,14 @@ $customErrorHandler = function (
 $errorMiddleware = $app->addErrorMiddleware(true, true, true);
 //$errorMiddleware->setDefaultErrorHandler($customErrorHandler);
 
-//$app->addErrorMiddleware(true, true, true);
-
-
-/*
-$app->get('/', function ($req, $res, $args) {
-    $res->getBody()->write('hola mundo');
-    return $res;    
-});*/
-
 $app->get('[/]', function (Request $request, Response $response) {    
     $payload = json_encode(["mensaje" => "Hola mundo"]);
-    
+    $datos = $request->getAttribute('datos');
+    var_dump($datos);
     $response->getBody()->write($payload);
     return $response->withHeader('Content-Type', 'application/json');
-})->add(new LoggerMiddleware());
+})->add(\AuthMiddleware::class . ':PasarDatos');//->add(\LoggerMiddleware::class . ':LogIngreso');
+//->add(new LoggerMiddleware());
 
 $app->group('/empleado', function (RouteCollectorProxy $group) {
     
@@ -112,11 +103,14 @@ $app->group('/empleado', function (RouteCollectorProxy $group) {
 
 $app->group('/mesa', function (RouteCollectorProxy $group) {
     
-    $group->post('/mas-usada[/]', \MesaController::class . ':GetMesaMasUsada')
+    $group->get('/factura-mas-alta[/]', \MesaController::class . ':GetMesasSegunFacturaMasAlta')
     ->add(new AuthMiddleware('socio'));
-    $group->post('/servir/{id}', \MesaController::class . ':ServirMesa')
-    ->add(new AuthMiddleware('mozo'));
+    $group->get('/facturado-por-fechas[/]', \MesaController::class . ':GetMesaTotalFacturadoPorFechas')
+    ->add(new AuthMiddleware('socio'));
+    $group->get('/mas-usada[/]', \MesaController::class . ':GetMesaMasUsada')
+    ->add(new AuthMiddleware('socio'));
     $group->post('/cobrar/{id}', \MesaController::class . ':CobrarMesa')
+    ->add(new LoggerMiddleware('Cobrar mesa'))
     ->add(new AuthMiddleware('mozo'));
     $group->post('/cerrar/{id}', \MesaController::class . ':CerrarMesa')
     ->add(new AuthMiddleware('socio'));
@@ -143,6 +137,7 @@ $app->group('/producto', function (RouteCollectorProxy $group) {
     
     $group->get('/descargar[/]', \ProductoController::class . ':DescargarCsv');
     $group->post('/subir[/]', \ProductoController::class . ':SubirCsv');
+    $group->get('/productos-segun-ventas[/]', \ProductoController::class . ':GetProductosSegunMasVentas');
     $group->get('[/]', \ProductoController::class . ':GetAll');
     $group->get('/{id}', \ProductoController::class . ':Get')
     ->add(\ProductoMiddleware::class . ':ControlarId');
@@ -158,13 +153,17 @@ $app->group('/producto', function (RouteCollectorProxy $group) {
 ->add(new AuthMiddleware('socio'));
 
 $app->group('/pedido', function (RouteCollectorProxy $group) {//sacar campo precio unitario
-    //GetCervezasPendientes
+    
+    $group->post('/servir/{id}', \PedidoController::class . ':ServirPedido')
+    ->add(new LoggerMiddleware('Servir mesa'))
+    ->add(new AuthMiddleware('mozo'));
     $group->get('/consultar-pedido[/]', \PedidoController::class . ':ConsultarPedido');
-    $group->post('/puntuar[/]', \PedidoController::class . ':PuntuarPedido');
-    $group->get('/mejores-comentarios[/]', \PedidoController::class . ':GetMejoresComentarios')
-    ->add(new AuthMiddleware('socio'));
+    $group->post('/puntuar[/]', \PedidoController::class . ':PuntuarPedido')
+    ->add(\PedidoMiddleware::class . ':ControlarPuntuarPedido');
     $group->get('/pedidos-por-entrega[/]', \PedidoController::class . ':GetPedidosPorEntrega')
     ->add(new AuthMiddleware('socio'));
+    $group->get('/pedidos-listos[/]', \PedidoController::class . ':GetPedidosListos')
+    ->add(new AuthMiddleware('mozo'));
 
     $group->get('/productos-encargados[/]', \PedidoController::class . ':GetProductosEncargados')
     ->add(new AuthMiddleware('bartender','cocinero','cervecero'));
@@ -173,51 +172,52 @@ $app->group('/pedido', function (RouteCollectorProxy $group) {//sacar campo prec
         $groupPendientes->get('/bebidas[/]', \PedidoController::class . ':GetBebidasPendientes')->add(new AuthMiddleware('bartender'));
         $groupPendientes->get('/comidas[/]', \PedidoController::class . ':GetComidasPendientes')->add(new AuthMiddleware('cocinero'));
         $groupPendientes->get('/cervezas[/]', \PedidoController::class . ':GetCervezasPendientes')->add(new AuthMiddleware('cervecero'));
-        
     });
+
+    $group->post('/atender[/]', \PedidoController::class . ':AtenderItems')
+    ->add(new EstadoItemMiddleware(EstadosPedido::EnPreparacion->value))
+    ->add(new LoggerMiddleware('Atender productos'))
+    ->add(new AuthMiddleware('bartender','cocinero','cervecero'));
+    $group->post('/terminar[/]', \PedidoController::class . ':TerminarItems')
+    ->add(new EstadoItemMiddleware(EstadosPedido::ListoParaServir->value))
+    ->add(new LoggerMiddleware('Terminar productos'))
+    ->add(new AuthMiddleware('bartender','cocinero','cervecero'));
     
-    $group->group('/atender', function (RouteCollectorProxy $groupAtender) {
-        $groupAtender->post('/bebidas[/]', \PedidoController::class . ':AtenderItems')
-        ->add(new EstadoItemMiddleware(EstadosPedido::EnPreparacion->value))->add(new AuthMiddleware('bartender'));
-        $groupAtender->post('/comidas[/]', \PedidoController::class . ':AtenderItems')
-        ->add(new EstadoItemMiddleware(EstadosPedido::EnPreparacion->value))->add(new AuthMiddleware('cocinero'));
-        $groupAtender->post('/cervezas[/]', \PedidoController::class . ':AtenderItems')
-        ->add(new EstadoItemMiddleware(EstadosPedido::EnPreparacion->value))->add(new AuthMiddleware('cervecero'));
-    });
-
-    $group->group('/terminar', function (RouteCollectorProxy $groupTerminar) {
-        $groupTerminar->post('/bebidas[/]', \PedidoController::class . ':TerminarItems')
-        ->add(new EstadoItemMiddleware(EstadosPedido::ListoParaServir->value))->add(new AuthMiddleware('bartender'));
-        $groupTerminar->post('/comidas[/]', \PedidoController::class . ':TerminarItems')
-        ->add(new EstadoItemMiddleware(EstadosPedido::ListoParaServir->value))->add(new AuthMiddleware('cocinero'));
-        $groupTerminar->post('/cervezas[/]', \PedidoController::class . ':TerminarItems')
-        ->add(new EstadoItemMiddleware(EstadosPedido::ListoParaServir->value))->add(new AuthMiddleware('cervecero'));
-    });
-
     $group->post('/imagen[/]', \PedidoController::class . ':AgregarImagen')
     ->add(\PedidoMiddleware::class . ':ControlarId')
-    ->add(new ImagenMiddleware())//controlar id
+    ->add(new ImagenMiddleware())
+    ->add(new LoggerMiddleware('Agregar foto al pedido'))
     ->add(new AuthMiddleware('mozo'));
+
     $group->get('[/]', \PedidoController::class . ':GetAll')
     ->add(new AuthMiddleware('socio'));
     $group->get('/{id}', \PedidoController::class . ':Get')//si se pone primero tapa las otras rutas
     ->add(\PedidoMiddleware::class . ':ControlarId')
     ->add(new AuthMiddleware('socio', 'mozo'));
-
     $group->get('/criterio/{idEstado}', \PedidoController::class . ':GetAllPorCriterio')
     ->add(new AuthMiddleware('socio', 'mozo'));
     $group->delete('/{id}', \PedidoController::class . ':Delete')
     ->add(\PedidoMiddleware::class . ':ControlarId')
+    ->add(new LoggerMiddleware('Cancelar pedido'))
     ->add(new AuthMiddleware('mozo'));
     $group->post('[/]', \PedidoController::class . ':Create')
     ->add(new PedidoMiddleware())
+    ->add(new LoggerMiddleware('Creacion pedido'))
     ->add(new AuthMiddleware('mozo'));
-    $group->put('[/]', \PedidoController::class . ':Update')->add(\PedidoMiddleware::class . ':ControlarParametros')
+    $group->put('[/]', \PedidoController::class . ':Update')
     ->add(\PedidoMiddleware::class . ':ControlarParametrosUpdate')
     ->add(\PedidoMiddleware::class . ':ControlarId')
+    ->add(new LoggerMiddleware('Modificacion pedido'))
     ->add(new AuthMiddleware('mozo'));
 
 });//->add(new AuthMiddleware());
+
+$app->group('/consulta', function (RouteCollectorProxy $group) {//sacar campo precio unitario
+    $group->get('/mejores-comentarios[/]', \ConsultaController::class . ':GetMejoresComentarios');
+    $group->get('/operaciones-por-sector[/]', \ConsultaController::class . ':GetOperacionesPorSector');
+    $group->get('/operaciones-por-empleado[/]', \ConsultaController::class . ':GetOperacionesPorEmpleado');
+    $group->get('/logs-por-empleado/{id}', \ConsultaController::class . ':GetLogsPorEmpleado');
+})->add(new AuthMiddleware('socio'));
 
 $app->get('/descargar-logo[/]', new PdfController())
 ->add(new AuthMiddleware('socio'));
@@ -227,7 +227,7 @@ $app->group('/login', function (RouteCollectorProxy $group) {
     $group->post('[/]', new AuthController());
     //$group->get('[/]', \LoginController::class . ':GetRol');
 
-});
+})->add(\LoggerMiddleware::class . ':LogIngreso');
 
 $app->run();
 

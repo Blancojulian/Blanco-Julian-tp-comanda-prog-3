@@ -7,10 +7,12 @@ require_once './enums/EEstadosPedido.php';
 
 class Pedido implements JsonSerializable
 {
-
+    private static $_querySelect = 'SELECT p.*, e.estado, m.codigo AS codigoMesa FROM pedidos p LEFT JOIN estadosPedido e ON p.idEstado = e.id LEFT JOIN mesas m ON p.idMesa = m.id';
+    
     public $id;
     public $codigo;
     public $nombreCliente;
+    public $idMesa;
     public $codigoMesa;
     public $estado;
     public $idEstado;
@@ -19,10 +21,7 @@ class Pedido implements JsonSerializable
     public $total;
     public $tiempoEstimado;
     public $horaFinalizado;
-    public $resenia;
-    public $puntajeMozo;
-    public $puntajeMesa;
-    public $puntajeRestaurante;
+    public $horaEntrega;
     public $fechaAlta;
     public $fechaModificacion;
     public $fechaCancelacion;
@@ -30,12 +29,13 @@ class Pedido implements JsonSerializable
     //public $horaPago;//ver, si tendria que poner a la hora que se cobra al cliente
     
     
-    public function __construct($codigo, $nombreCliente, $codigoMesa, $idEstado, $estado, $idMozo, $total = 0, $tiempoEstimado = null, $horaFinalizado = null,
-    $resenia = null, $puntajeMozo = null, $puntajeMesa = null, $puntajeRestaurante = null, $fechaAlta = null, $fechaModificacion = null, $fechaCancelacion = null, 
+    public function __construct($codigo, $nombreCliente, $idMesa, $codigoMesa, $idEstado, $estado, $idMozo, $total = 0, $tiempoEstimado = null, $horaFinalizado = null,
+    $horaEntrega = null, $fechaAlta = null, $fechaModificacion = null, $fechaCancelacion = null, 
     $id = null, $imagen = null, $items = []) {
         $this->id = $id;
         $this->codigo = $codigo;
         $this->nombreCliente = $nombreCliente;
+        $this->idMesa = intval($idMesa);
         $this->codigoMesa = $codigoMesa;
         $this->estado = $estado;
         $this->idEstado = intval($idEstado);
@@ -43,12 +43,8 @@ class Pedido implements JsonSerializable
         $this->total = floatval($total);
         $this->tiempoEstimado = isset($tiempoEstimado) ? new DateTime($tiempoEstimado) : $tiempoEstimado;
         $this->horaFinalizado = isset($horaFinalizado) ? new DateTime($horaFinalizado) : $horaFinalizado;
+        $this->horaEntrega = isset($horaEntrega) ? new DateTime($horaEntrega) : $horaEntrega;
         
-        $this->resenia = $resenia;
-        $this->puntajeMozo = $puntajeMozo;
-        $this->puntajeMesa = $puntajeMesa;
-        $this->puntajeRestaurante = $puntajeRestaurante;
-
         $this->fechaAlta = isset($fechaAlta) ? new DateTime($fechaAlta) : null;//date("Y-m-d H:i:s", strtotime($date))
         $this->fechaModificacion = isset($fechaModificacion) ? new DateTime($fechaModificacion) : null;
         $this->fechaCancelacion = isset($fechaCancelacion) ? new DateTime($fechaCancelacion) : null;
@@ -76,22 +72,22 @@ class Pedido implements JsonSerializable
     public function GetHoraFinalizado() {
         return isset($this->horaFinalizado) ? $this->horaFinalizado->format('Y/m/d H:i:s') : null;
     }
+    public function GetHoraEntrega() {
+        return isset($this->horaEntrega) ? $this->horaEntrega->format('Y/m/d H:i:s') : null;
+    }
 
     private static function EjecutarQueryInsertar($consulta, $pedido) {
         
         
         $consulta->bindValue(':codigo', $pedido->codigo, PDO::PARAM_STR);
         $consulta->bindValue(':nombreCliente', $pedido->nombreCliente, PDO::PARAM_STR);
-        $consulta->bindValue(':codigoMesa', $pedido->codigoMesa, PDO::PARAM_STR);
+        $consulta->bindValue(':idMesa', $pedido->idMesa, PDO::PARAM_INT);
         $consulta->bindValue(':idEstado', $pedido->idEstado, PDO::PARAM_INT);
         $consulta->bindValue(':total', $pedido->total, PDO::PARAM_STR);//float
         $consulta->bindValue(':tiempoEstimado', $pedido->GetTiempoEstimado(), PDO::PARAM_STR);
         $consulta->bindValue(':horaFinalizado', $pedido->GetHoraFinalizado(), PDO::PARAM_STR);
+        $consulta->bindValue(':horaEntrega', $pedido->GetHoraEntrega(), PDO::PARAM_STR);
         $consulta->bindValue(':idMozo', $pedido->idMozo, PDO::PARAM_INT);
-        $consulta->bindValue(':resenia', $pedido->resenia, PDO::PARAM_STR);
-        $consulta->bindValue(':puntajeMozo', $pedido->puntajeMozo, PDO::PARAM_INT);
-        $consulta->bindValue(':puntajeMesa', $pedido->puntajeMesa, PDO::PARAM_INT);
-        $consulta->bindValue(':puntajeRestaurante', $pedido->puntajeRestaurante, PDO::PARAM_INT);
         $consulta->bindValue(':imagen', $pedido->imagen, PDO::PARAM_STR);
 
         $consulta->execute();
@@ -100,10 +96,10 @@ class Pedido implements JsonSerializable
     public function CrearPedido()
     {
         $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
-        $query = 'INSERT INTO pedidos (codigo,nombreCliente,codigoMesa,idEstado,idMozo,total,tiempoEstimado,
-        horaFinalizado,resenia, puntajeMozo, puntajeMesa,puntajeRestaurante,imagen,fechaAlta)
-        VALUES(:codigo,:nombreCliente,:codigoMesa,:idEstado,:idMozo,:total,:tiempoEstimado,:horaFinalizado,
-        :resenia, :puntajeMozo, :puntajeMesa,:puntajeRestaurante,:imagen,:fechaAlta)';
+        $query = 'INSERT INTO pedidos (codigo,nombreCliente,idMesa,idEstado,idMozo,total,tiempoEstimado,
+        horaFinalizado,horaEntrega,imagen,fechaAlta)
+        VALUES(:codigo,:nombreCliente,:idMesa,:idEstado,:idMozo,:total,:tiempoEstimado,:horaFinalizado,
+        :horaEntrega,:imagen,:fechaAlta)';
         $consulta = $objetoAccesoDato->RetornarConsulta($query);
 
         $fechaAlta = date('Y/m/d H:i:s', strtotime("now"));
@@ -118,10 +114,10 @@ class Pedido implements JsonSerializable
     public function ModificarPedido()
     {
         $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
-        $query = 'UPDATE pedidos SET codigo = :codigo,nombreCliente = :nombreCliente,codigoMesa = :codigoMesa,
+        $query = 'UPDATE pedidos SET codigo = :codigo,nombreCliente = :nombreCliente,idMesa = :idMesa,
         idEstado = :idEstado,idMozo = :idMozo,total = :total,fechaModificacion = :fechaModificacion,
-        tiempoEstimado = :tiempoEstimado, horaFinalizado = :horaFinalizado, resenia = :resenia, puntajeMozo = :puntajeMozo, 
-        puntajeMesa = :puntajeMesa, puntajeRestaurante = :puntajeRestaurante, imagen = :imagen WHERE id = :id';
+        tiempoEstimado = :tiempoEstimado, horaFinalizado = :horaFinalizado, horaEntrega = :horaEntrega, 
+        imagen = :imagen WHERE id = :id';
         $consulta = $objetoAccesoDato->RetornarConsulta($query);
 
         $fechaModificacion = date('Y/m/d H:i:s', strtotime("now"));
@@ -150,6 +146,7 @@ class Pedido implements JsonSerializable
         $consulta->bindColumn('id', $auxPedido->id, PDO::PARAM_INT);
         $consulta->bindColumn('codigo', $auxPedido->codigo, PDO::PARAM_STR);
         $consulta->bindColumn('nombreCliente', $auxPedido->nombreCliente, PDO::PARAM_STR);
+        $consulta->bindColumn('idMesa', $auxPedido->idMesa, PDO::PARAM_INT);
         $consulta->bindColumn('codigoMesa', $auxPedido->codigoMesa, PDO::PARAM_STR);
         $consulta->bindColumn('idEstado', $auxPedido->idEstado, PDO::PARAM_INT);
         $consulta->bindColumn('estado', $auxPedido->estado, PDO::PARAM_STR);
@@ -157,10 +154,7 @@ class Pedido implements JsonSerializable
         $consulta->bindColumn('total', $auxPedido->total, PDO::PARAM_STR);//float
         $consulta->bindColumn('tiempoEstimado', $auxPedido->tiempoEstimado, PDO::PARAM_STR);
         $consulta->bindColumn('horaFinalizado', $auxPedido->horaFinalizado, PDO::PARAM_STR);
-        $consulta->bindColumn('resenia', $auxPedido->resenia, PDO::PARAM_STR);
-        $consulta->bindColumn('puntajeMozo', $auxPedido->puntajeMozo, PDO::PARAM_INT);
-        $consulta->bindColumn('puntajeMesa', $auxPedido->puntajeMesa, PDO::PARAM_INT);
-        $consulta->bindColumn('puntajeRestaurante', $auxPedido->puntajeRestaurante, PDO::PARAM_INT);
+        $consulta->bindColumn('horaEntrega', $auxPedido->horaEntrega, PDO::PARAM_STR);
         $consulta->bindColumn('fechaAlta', $auxPedido->fechaAlta, PDO::PARAM_STR);
         $consulta->bindColumn('fechaModificacion', $auxPedido->fechaModificacion, PDO::PARAM_STR);
         $consulta->bindColumn('fechaCancelacion', $auxPedido->fechaCancelacion, PDO::PARAM_STR);
@@ -175,13 +169,13 @@ class Pedido implements JsonSerializable
         $pedido = null;
         $pedidos = [];
         while ($fila = $consulta->fetch(PDO::FETCH_BOUND)) {
-            $pedido = new Pedido($p->codigo, $p->nombreCliente, $p->codigoMesa, $p->idEstado, $p->estado, $p->idMozo,floatval($p->total), 
-            $p->tiempoEstimado, $p->horaFinalizado, $p->resenia, $p->puntajeMozo, $p->puntajeMesa, $p->puntajeRestaurante, $p->fechaAlta, 
-            $p->fechaModificacion, $p->fechaCancelacion, $p->id, $p->imagen);
+            $pedido = new Pedido($p->codigo, $p->nombreCliente, $p->idMesa, $p->codigoMesa, $p->idEstado, $p->estado, $p->idMozo,floatval($p->total), 
+            $p->tiempoEstimado, $p->horaFinalizado, $p->horaEntrega, $p->fechaAlta, $p->fechaModificacion, $p->fechaCancelacion, $p->id, $p->imagen);
             $pedido->items = ItemPedido::GetItems($pedido->id);
             array_push($pedidos, $pedido);
+            
         }
-
+        
         return $pedidos;
     }
 
@@ -191,9 +185,8 @@ class Pedido implements JsonSerializable
 
         $pedido = null;
         if ($consulta->fetch(PDO::FETCH_BOUND)) {
-            $pedido = new Pedido($p->codigo, $p->nombreCliente, $p->codigoMesa, $p->idEstado, $p->estado, $p->idMozo,floatval($p->total), 
-            $p->tiempoEstimado, $p->horaFinalizado, $p->resenia, $p->puntajeMozo, $p->puntajeMesa, $p->puntajeRestaurante, $p->fechaAlta, 
-            $p->fechaModificacion, $p->fechaCancelacion, $p->id, $p->imagen);
+            $pedido = new Pedido($p->codigo, $p->nombreCliente, $p->idMesa, $p->codigoMesa, $p->idEstado, $p->estado, $p->idMozo,floatval($p->total), 
+            $p->tiempoEstimado, $p->horaFinalizado, $p->horaEntrega, $p->fechaAlta, $p->fechaModificacion, $p->fechaCancelacion, $p->id, $p->imagen);
             $pedido->items = ItemPedido::GetItems($pedido->id);
         }
 
@@ -203,7 +196,7 @@ class Pedido implements JsonSerializable
     public static function GetPedidos()
     {
         $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
-        $query = 'SELECT p.*, e.estado FROM pedidos p LEFT JOIN estadosPedido e ON p.idEstado = e.id WHERE p.fechaCancelacion IS NULL';
+        $query = self::$_querySelect . ' WHERE p.fechaCancelacion IS NULL';
 
         $consulta = $objetoAccesoDato->RetornarConsulta($query);
         $consulta->execute();
@@ -214,7 +207,7 @@ class Pedido implements JsonSerializable
     public static function GetPedido($idPedido)
     {
         $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
-        $query = 'SELECT p.*, e.estado FROM pedidos p LEFT JOIN estadosPedido e ON p.idEstado = e.id WHERE p.id = :id AND p.fechaCancelacion IS NULL';
+        $query = self::$_querySelect . ' WHERE p.id = :id AND p.fechaCancelacion IS NULL';
 
         $consulta = $objetoAccesoDato->RetornarConsulta($query);
         $consulta->bindValue(':id', $idPedido, PDO::PARAM_INT);
@@ -225,7 +218,7 @@ class Pedido implements JsonSerializable
     public static function GetPedidoPorCodigo($codigoPedido)
     {
         $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
-        $query = 'SELECT p.*, e.estado FROM pedidos p LEFT JOIN estadosPedido e ON p.idEstado = e.id WHERE p.codigo = :codigoPedido AND p.fechaCancelacion IS NULL';
+        $query = self::$_querySelect . ' WHERE p.codigo = :codigoPedido AND p.fechaCancelacion IS NULL';
 
         $consulta = $objetoAccesoDato->RetornarConsulta($query);
         $consulta->bindValue(':codigoPedido', $codigoPedido, PDO::PARAM_STR);
@@ -237,7 +230,7 @@ class Pedido implements JsonSerializable
     public static function GetPedidoPorMesaConClienteComiendo($idMesa)
     {
         $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
-        $query = 'SELECT p.*, e.estado FROM pedidos p LEFT JOIN estadosPedido e ON p.idEstado = e.id LEFT JOIN mesas m ON p.codigoMesa = m.codigo 
+        $query = 'SELECT p.*, e.estado, m.codigoMesa AS codigoMesa FROM pedidos p LEFT JOIN estadosPedido e ON p.idEstado = e.id LEFT JOIN mesas m ON p.idMesa = m.id 
         WHERE m.id = :id AND p.idEstado = 3 AND p.fechaCancelacion IS NULL AND p.horaFinalizado  = ( SELECT MAX(p.horaFinalizado) FROM pedidos WHERE p.fechaCancelacion IS NULL)';
 
         $consulta = $objetoAccesoDato->RetornarConsulta($query);
@@ -250,13 +243,25 @@ class Pedido implements JsonSerializable
     public static function GetPedidosPorIdEstado($idEstado)
     {
         $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
-        $query = 'SELECT p.*, e.estado FROM pedidos p LEFT JOIN estadosPedido e ON p.idEstado = e.id WHERE p.idEstado = :idEstado AND p.fechaCancelacion IS NULL';
+        $query = self::$_querySelect . ' WHERE p.idEstado = :idEstado AND p.fechaCancelacion IS NULL';
         $consulta = $objetoAccesoDato->RetornarConsulta($query);
         $consulta->bindValue(':idEstado', $idEstado, PDO::PARAM_INT);
         $consulta->execute();
         
         return self::FetchQueryGetAll($consulta);
     }
+
+    public static function GetPedidosListosParaServir()
+    {
+        $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
+        $query = self::$_querySelect . ' WHERE p.idEstado = 3 AND p.fechaCancelacion IS NULL AND p.horaEntrega IS NULL';
+        $consulta = $objetoAccesoDato->RetornarConsulta($query);
+        $consulta->execute();
+        
+        return self::FetchQueryGetAll($consulta);
+    }
+    //no usar ahora esta en encuesta
+    /*
     public static function GetPedidosPorPuntaje($puntaje, $esMayor = true)
     {
         $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
@@ -271,12 +276,13 @@ class Pedido implements JsonSerializable
         $pedidos = self::FetchQueryGetAll($consulta);
         $resenias = array_map(fn($p) => $p->ToResenia(), $pedidos);
         return $resenias;
-    }
-
+    }*/
+    //ya nose usa se enviar los items
     public static function GetPedidosPorTipoProducto($idTipoProducto, $idEstadoPedido = null)
     {
         $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
-        $query = 'SELECT p.*, e.estado FROM pedidos p LEFT JOIN estadosPedido e ON p.idEstado = e.id 
+        $query = 'SELECT p.*, e.estado, m.codigo AS codigoMesa FROM pedidos p LEFT JOIN estadosPedido e 
+        ON p.idEstado = e.id LEFT JOIN mesas m ON p.idMesa = m.id
         LEFT JOIN itemsPedido i ON i.idPedido = p.id LEFT JOIN productos pro ON i.idProducto = pro.id 
         WHERE p.fechaCancelacion IS NULL AND pro.idTipoProducto = :idTipoProducto';
         if (isset($idEstadoPedido)) {
@@ -289,24 +295,25 @@ class Pedido implements JsonSerializable
 
         return self::FetchQueryGetAll($consulta);
     }
-
-    public static function GetCodigoMesaConMasPedidos() {
+//mesa mas usada
+//usar esto para el punto 21, lista de mesas de la que hizo la fc mas barata a la cara, usar max para ver su total mas alto
+    public static function GetMesaConMasPedidos() {
         $retorno = null;
         $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
-        $query = 'SELECT codigoMesa, COUNT(*) AS cantidad
+        $query = 'SELECT idMesa, COUNT(*) AS cantidad
         FROM pedidos
-        WHERE fechaCancelacion IS NOT NULL
-        GROUP BY codigoMesa
+        WHERE fechaCancelacion IS NULL
+        GROUP BY idMesa
         ORDER BY cantidad DESC
         LIMIT 1';
         $consulta = $objetoAccesoDato->RetornarConsulta($query);
         $consulta->execute();
-        $consulta->bindColumn('codigoMesa', $codigoMesa, PDO::PARAM_STR);
+        $consulta->bindColumn('idMesa', $idMesa, PDO::PARAM_INT);
         $consulta->bindColumn('cantidad', $cantidad, PDO::PARAM_INT);
 
         if ($consulta->fetch(PDO::FETCH_BOUND)) {
             $retorno = [
-                'codigoMesa' => $codigoMesa,
+                'idMesa' => $idMesa,
                 'cantidad' => $cantidad
             ];
         }
@@ -317,8 +324,9 @@ class Pedido implements JsonSerializable
     public static function GetPedidosPorEntrega($fueraDeTiempo = false)
     {
         $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
-        $query = 'SELECT p.*, e.estado FROM pedidos p LEFT JOIN estadosPedido e ON p.idEstado = e.id WHERE p.fechaCancelacion IS NULL';
-        $query .= $fueraDeTiempo ? ' AND p.horaFinalizado > p.tiempoEstimado' : ' AND p.horaFinalizado < p.tiempoEstimado';
+        $query = 'SELECT p.*, e.estado, m.codigo AS codigoMesa FROM pedidos p LEFT JOIN estadosPedido e 
+        ON p.idEstado = e.id LEFT JOIN mesas m ON p.idMesa = m.id WHERE p.fechaCancelacion IS NULL';
+        $query .= $fueraDeTiempo ? ' AND p.horaEntrega > p.tiempoEstimado' : ' AND p.horaEntrega <= p.tiempoEstimado';
         $consulta = $objetoAccesoDato->RetornarConsulta($query);
         $consulta->execute();
         
@@ -354,35 +362,23 @@ class Pedido implements JsonSerializable
         return $fechaCancelacion;
     }
 
-    public function ToResenia() {
-        $arrPuntajes = [];
-        foreach ($this->items as $item) {
-            array_push($arrPuntajes, $item->ToResenia());
-        }
-        return [
-            'resenia' => $this->resenia,
-            'puntajeMozo' => $this->puntajeMozo,
-            'puntajeMesa' => $this->puntajeMesa,
-            'puntajeRestaurante' => $this->puntajeRestaurante,
-            'puntajesItems' => $arrPuntajes
-
-        ];
-    }
+    
     
     public function jsonSerialize(){
-        $tiempoRestante = $this->tiempoEstimado instanceof DateTime ? CalcularTiempoRestante($this->tiempoEstimado) : null;
         $json = [
             'id' => $this->id,
             'codigo' => $this->codigo,
             'nombreCliente' => $this->nombreCliente,
+            'idMesa' => $this->idMesa,
             'codigoMesa' => $this->codigoMesa,
             'estado' => $this->estado,
             'total' => $this->total,
             'tiempoEstimado' => $this->GetTiempoEstimado(),
             'horaFinalizado' => $this->GetHoraFinalizado(),
+            'horaEntrega' => $this->GetHoraEntrega(),
             'items' => $this->items
         ];
-        if ($this->idEstado != EstadosPedido::ListoParaServir->value) {
+        if ( !isset($this->horaEntrega) || $this->idEstado != EstadosPedido::ListoParaServir->value) {
             $tiempoRestante = $this->tiempoEstimado instanceof DateTime ? CalcularTiempoRestante($this->tiempoEstimado) : null;
             $json['tiempoRestante'] = $tiempoRestante;
         }

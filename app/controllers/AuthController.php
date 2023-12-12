@@ -39,7 +39,7 @@ class AuthController extends BaseRespuestaError {
         ->withHeader('Content-Type', 'application/json');
     }
 
-
+/*
     public function Login(Request $req, Response $res, array $args = []) {
 
         $parametros = $req->getParsedBody();
@@ -60,7 +60,7 @@ class AuthController extends BaseRespuestaError {
         $res->getBody()->write($payload);
         return $res
         ->withHeader('Content-Type', 'application/json');
-    }
+    }*/
 
 }
 

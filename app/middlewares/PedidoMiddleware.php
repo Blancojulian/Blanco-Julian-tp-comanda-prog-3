@@ -5,6 +5,7 @@ require_once './models/ItemPedido.php';
 require_once './models/Mesa.php';
 require_once './utils/utils.php';
 require_once './enums/EEstadosMesa.php';
+require_once './utils/BaseRespuestaError.php';
 
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Psr\Http\Server\RequestHandlerInterface as RequestHandler;
@@ -14,7 +15,7 @@ use Slim\Exception\HttpException;
 use Slim\Exception\HttpBadRequestException;
 use Slim\Exception\HttpNotFoundException;
 
-class PedidoMiddleware
+class PedidoMiddleware extends BaseRespuestaError
 {
     /**
      * Example middleware invokable class
@@ -29,14 +30,6 @@ class PedidoMiddleware
         return $this->ControlarParametrosCreate($request, $handler);
     }
 
-    private static function RespuestaError($codigo = 400, $error = 'Faltan parametros') {
-        $response = new Response();
-        $payload = json_encode(['error' => $error]);
-        $response->getBody()->write($payload);
-        $response = $response->withStatus($codigo);
-        $response = $response->withHeader('Content-Type', 'application/json');
-        return $response;
-    }
     //$routeArguments = \Slim\Routing\RouteContext::fromRequest($request)->getRoute()->getArguments();
     //https://www.slimframework.com/docs/v4/objects/request.html#route-object
     //recuperar args
@@ -93,7 +86,7 @@ class PedidoMiddleware
         //validar que mesa este cerrada
         $mesa = Mesa::GetMesaPorCodigo($parametros['codigoMesa']);
         if (!isset($mesa)) {
-            return self::RespuestaError(400, 'Mesa codigo '.$parametros['codigoMesa'].' no existe');
+            return self::RespuestaError(404, 'Mesa codigo '.$parametros['codigoMesa'].' no encontrada');
         }
         
         if ($mesa->codigo !== $pedido->codigoMesa && $mesa->idEstado != EstadosMesa::Cerrada->value) {
@@ -155,7 +148,7 @@ class PedidoMiddleware
         $parametros = $request->getParsedBody();
         $idEstadoListoParaServir = 3;
         $listaItemsNoPuntuados = [];
-        $$mensajeError = null;
+        $mensajeError = null;
         if (!isset($parametros['codigoPedido']) || !isset($parametros['codigoMesa']) || !isset($parametros['resenia']) || 
         !isset($parametros['puntajeMesa']) || !isset($parametros['puntajeMozo']) || !isset($parametros['puntajeRestaurante']) || 
         !isset($parametros['puntajeItems']) || !is_array($parametros['puntajeItems']) || count($parametros['puntajeItems']) <= 0) {

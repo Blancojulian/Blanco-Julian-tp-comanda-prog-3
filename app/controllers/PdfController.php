@@ -19,9 +19,6 @@ class PdfController extends BaseRespuestaError {
 
     public function __invoke(Request $request, Response $response, array $args = []) {
 
-
-        //nuevo
-
         $pdf = new FPDF();
         $filename = 'logoEmpresa.pdf';
 

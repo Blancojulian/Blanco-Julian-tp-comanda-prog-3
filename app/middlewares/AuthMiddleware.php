@@ -70,6 +70,26 @@ class AuthMiddleware extends BaseRespuestaError
         return $response->withHeader('Content-Type', 'application/json');
     }
 
+    public function PasarDatos(Request $request, RequestHandler $handler): Response {
+        $data = null;
+        
+        try {
+            $header = $request->getHeaderLine('Authorization');
+            if (empty($header)) {
+                throw new Exception("Error en header");
+            }
+            $token = trim(explode("Bearer", $header)[1]);
+            AutentificadorJWT::VerificarToken($token);
+            $data = AutentificadorJWT::ObtenerData($token);
+            $request = $request->withAttribute('datos', $data);
+        } catch (\Exception $e) {
+            return self::RespuestaError(401, 'Hubo un error con el token');
+        }
+        $response = $handler->handle($request);
+
+        return $response;
+    }
+
 }
 
 ?>

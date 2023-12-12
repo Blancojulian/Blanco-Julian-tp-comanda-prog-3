@@ -36,38 +36,20 @@ class ProductoMiddleware extends BaseRespuestaError
 
         $response = null;
         
-        $puesto = Puesto::GetPuestoPorNombre($parametros['puesto']);
-        if (!isset($puesto)) {
-            return self::RespuestaError(400, "Debe enviar un puesto valido");
-            
-        }
-
-        $empleado = Empleado::GetEmpleadoPorDni($parametros['dni']);
-
-        if (isset($empleado)) {
-            return self::RespuestaError(400, "Empleado con dni $empleado->dni ya existe");
-        }
-        $email = strtolower($parametros['email']);
-        $empleado = Empleado::GetEmpleadoPorEmail($email);
-        if (isset($empleado)) {
-            return self::RespuestaError(400, "El email $empleado->email ya se encuentra en uso");
-        }
-        //nuevo
         
         //($nombre, $precio, $stock, $idTipoProducto, $tipoProducto, $fechaAlta = null, $fechaModificacion = null, $fechaBaja = null, $id = null) {
 
         if (!isset($parametros['nombre']) || !isset($parametros['precio']) ||
         !isset($parametros['stock']) || !isset($parametros['tipoProducto'])) {
-            throw new HttpBadRequestException($req, 'Debe enviar nombre, precio, stock y tipo de producto');
+            return self::RespuestaError(400, 'Debe enviar nombre, precio, stock y tipo de producto');
         }
         $tipoProducto = TipoProducto::GetTipoPorNombre($parametros['tipoProducto']);
         if (!isset($tipoProducto)) {
-            throw new HttpBadRequestException($req, 'Tipo de producto invalido');
-            
+            return self::RespuestaError(400, 'Tipo de producto invalido');
         }
 
         if (!is_numeric($parametros['precio']) || !EsNumeroEntero($parametros['stock'])) {
-            throw new HttpBadRequestException($req, 'Precio debe ser un numero y stock numero entero');
+            return self::RespuestaError(400, 'Precio debe ser un numero y stock numero entero');
         }
         
         $response = $handler->handle($request);

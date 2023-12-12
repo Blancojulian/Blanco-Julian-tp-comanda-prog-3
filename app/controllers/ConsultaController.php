@@ -1,7 +1,11 @@
 <?php
 
 require_once './models/Empleado.php';
+require_once './models/Encuesta.php';
+require_once './models/Operacion.php';
+require_once './models/Log.php';
 require_once './models/Puesto.php';
+require_once './utils/utils.php';
 require_once './interfaces/IController.php';
 
 use Psr\Http\Message\ServerRequestInterface as Request;
@@ -10,8 +14,46 @@ use Slim\Exception\HttpException;
 use Slim\Exception\HttpBadRequestException;
 use Slim\Exception\HttpNotFoundException;
 
-class EmpleadoController implements IController {
+class ConsultaController {
+//ver, tiro error, Column not found: 1054 Unknown column &#039;p.puntajeRestaurante&#039; in &#039;order clause&#039;
+    public function GetMejoresComentarios(Request $req, Response $res, array $args = []) {
+        $encuestas = Encuesta::GetEncuestasPorPuntaje(7);
+        $payload = json_encode($encuestas);
+        $res->getBody()->write($payload);
 
+        return $res;
+    }
+    
+    public function GetOperacionesPorSector(Request $req, Response $res, array $args = []) {
+        $operaciones = Operacion::GetCantidadOperacionesPorSector();
+        $payload = json_encode($operaciones);
+        $res->getBody()->write($payload);
+
+        return $res;
+    }
+
+    public function GetOperacionesPorEmpleado(Request $req, Response $res, array $args = []) {
+        $operaciones = Operacion::GetCantidadOperacionesPorEmpleado();
+        $payload = json_encode($operaciones);
+        $res->getBody()->write($payload);
+
+        return $res;
+    }
+
+    public function GetLogsPorEmpleado(Request $req, Response $res, array $args = []) {
+        if (!isset($args['id'])) {
+            throw new HttpBadRequestException($req, 'Debe enviar id');   
+        }
+        $id = $args['id'];
+        if (!EsNumeroEntero($id)) {
+            throw new HttpBadRequestException($req, 'Id debe ser un numero');   
+        }
+        $logs = Log::GetLogsPorUsuario($id);
+        $payload = json_encode($logs);
+        $res->getBody()->write($payload);
+
+        return $res;
+    }
     public function Get(Request $req, Response $res, array $args = []) {
         if (!isset($args['id'])) {
             throw new HttpBadRequestException($req, 'Debe enviar id');   
@@ -83,42 +125,9 @@ class EmpleadoController implements IController {
         if (!isset($empleado)) {
             throw new HttpNotFoundException($req, 'Empleado no existe');   
         }
-        Empleado::BajaEmpleado($empleado->id);
+        $empleado->baja = true;
+        $empleado->ModificarEmpleado();
         $res->getBody()->write(json_encode(['mensaje' => "Empleado eliminado"]));
-        return $res; 
-    }
-
-    public function SuspenderEmpleado(Request $req, Response $res, array $args = []) {
-        if (!isset($args['id'])) {
-            throw new HttpBadRequestException($req, 'Debe enviar el id');   
-        }
-        $id = $args['id'];
-        if (!is_numeric($id)) {
-            throw new HttpBadRequestException($req, 'Id debe ser un numero');   
-        }
-        $empleado = Empleado::GetEmpleado($id);
-        if (!isset($empleado)) {
-            throw new HttpNotFoundException($req, 'Empleado no existe');   
-        }
-        Empleado::SuspenderEmpleado($empleado->id);
-        $res->getBody()->write(json_encode(['mensaje' => "Empleado suspendido"]));
-        return $res; 
-    }
-
-    public function HabilitarEmpleado(Request $req, Response $res, array $args = []) {
-        if (!isset($args['id'])) {
-            throw new HttpBadRequestException($req, 'Debe enviar el id');   
-        }
-        $id = $args['id'];
-        if (!is_numeric($id)) {
-            throw new HttpBadRequestException($req, 'Id debe ser un numero');   
-        }
-        $empleado = Empleado::GetEmpleado($id);
-        if (!isset($empleado)) {
-            throw new HttpNotFoundException($req, 'Empleado no existe');   
-        }
-        Empleado::SuspenderEmpleado($empleado->id, false);
-        $res->getBody()->write(json_encode(['mensaje' => "Empleado suspendido"]));
         return $res; 
     }
 

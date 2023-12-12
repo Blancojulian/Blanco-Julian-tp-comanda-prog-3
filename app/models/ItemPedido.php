@@ -10,13 +10,14 @@ class ItemPedido implements JsonSerializable
     public $precioUnitario;
     public $idEstado;
     public $estado;
+    public $idPedido;
     public $idEmpleado;
     public $tiempoEstimado;
     public $horaFinalizado;
     public $puntaje;
     public $idTipoProducto;//con este atributo controlar que corresponda de que se encarga cada empleado
     
-    public function __construct($idProducto, $producto, $precioUnitario, $idTipoProducto, $idEstado, $estado, $idEmpleado = null, $tiempoEstimado = null, $horaFinalizado = null, $puntaje = null, $id = null) {
+    public function __construct($idProducto, $producto, $precioUnitario, $idTipoProducto, $idEstado, $estado, $idPedido = null, $idEmpleado = null, $tiempoEstimado = null, $horaFinalizado = null, $puntaje = null, $id = null) {
         
         $this->idProducto = intval($idProducto);
         $this->producto = $producto;
@@ -24,9 +25,10 @@ class ItemPedido implements JsonSerializable
         $this->idTipoProducto = intval($idTipoProducto);
         $this->idEstado = intval($idEstado);
         $this->estado = $estado;
+        $this->idPedido = isset($idPedido) ? intval($idPedido) : null;
         $this->idEmpleado = isset($idEmpleado) ? intval($idEmpleado) : null;
-        $this->tiempoEstimado = $tiempoEstimado;
-        $this->horaFinalizado = $horaFinalizado;
+        $this->tiempoEstimado = isset($tiempoEstimado) ? new DateTime($tiempoEstimado) : null;
+        $this->horaFinalizado = isset($horaFinalizado) ? new DateTime($horaFinalizado) : null;
         $this->puntaje = isset($puntaje) ? intval($puntaje) : null;
         $this->id = isset($id) ? intval($id) : null;
 
@@ -47,12 +49,13 @@ class ItemPedido implements JsonSerializable
     public function GetHoraFinalizado() {
         return isset($this->horaFinalizado) ? $this->horaFinalizado->format('Y/m/d H:i:s') : null;
     }
-    private static function EjecutarQueryInsertar($consulta, $idPedido, $item) {
-       
-        $consulta->bindValue(':idPedido', intval($idPedido), PDO::PARAM_INT);
+    private static function EjecutarQueryInsertar($consulta, $item, $idPedido = null) {
+        $idPedido = isset($idPedido) ? $idPedido : $item->idPedido;
+        $consulta->bindValue(':idPedido', $idPedido, PDO::PARAM_INT);
         $consulta->bindValue(':idProducto', $item->idProducto, PDO::PARAM_INT);
         $consulta->bindValue(':precioUnitario', $item->precioUnitario, PDO::PARAM_STR);//ver sino tirar error pq es float
         $consulta->bindValue(':idEstado', $item->idEstado, PDO::PARAM_INT);
+        $consulta->bindValue(':idPedido', $item->idPedido, PDO::PARAM_INT);
         $consulta->bindValue(':idEmpleado', $item->idEmpleado, PDO::PARAM_INT);
         $consulta->bindValue(':tiempoEstimado', $item->GetTiempoEstimado(), PDO::PARAM_STR);
         $consulta->bindValue(':horaFinalizado', $item->GetHoraFinalizado(), PDO::PARAM_STR);
@@ -61,10 +64,36 @@ class ItemPedido implements JsonSerializable
         
         $consulta->execute();
     }
+
+    public function CrearItem()
+    {
+        $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
+        $query = 'INSERT INTO itemsPedido (idPedido,idProducto,precioUnitario,idEstado,idEmpleado,tiempoEstimado,horaFinalizado,puntaje)
+        VALUES(:idPedido,:idProducto,:precioUnitario,:idEstado,:idEmpleado,:tiempoEstimado,:horaFinalizado,:puntaje)';
+        $consulta = $objetoAccesoDato->RetornarConsulta($query);
+        self::EjecutarQueryInsertar($consulta, $this);
+
+        $this->id = $objetoAccesoDato->RetornarUltimoIdInsertado();;
+        return $this->id;
+    }
+
+    public function MofidicarItem()
+    {
+        $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
+        $query = 'UPDATE itemsPedido SET idPedido = :idPedido, idProducto = :idProducto, 
+        precioUnitario = :precioUnitario, idEstado = :idEstado, idEmpleado = :idEmpleado, 
+        tiempoEstimado = :tiempoEstimado, horaFinalizado = :horaFinalizado, 
+        puntaje = :puntaje WHERE id = :id';
+        $consulta = $objetoAccesoDato->RetornarConsulta($query);
+        $consulta->bindValue(':id', $this->id, PDO::PARAM_INT);
+        self::EjecutarQueryInsertar($consulta, $this);
+        
+        return $objetoAccesoDato->RetornarUltimoIdInsertado();
+    }
     //no se va a usar siempre se va insertar un array de pedidos y para modificar se eliminan los anteriores y agregan los nuevos
     //por ahora
     //no hacer esto, ahora tienen id
-    public static function CrearItem($idPedido, ItemPedido $item)
+    public static function CrearItem2($idPedido, ItemPedido $item)
     {
         $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
         $query = 'INSERT INTO itemsPedido (idPedido,idProducto,precioUnitario,idEstado,idEmpleado,tiempoEstimado,horaFinalizado,puntaje)
@@ -76,7 +105,7 @@ class ItemPedido implements JsonSerializable
         return $this->id;
     }
 
-    public static function MofidicarItem($idPedido, ItemPedido $item)
+    public static function MofidicarItem2($idPedido, ItemPedido $item)
     {
         $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
         $query = 'UPDATE itemsPedido SET idPedido = :idPedido, idProducto = :idProducto, 
@@ -98,13 +127,15 @@ class ItemPedido implements JsonSerializable
         $consulta = $objetoAccesoDato->RetornarConsulta($query);
         
         foreach ($items as $item) {
-            self::EjecutarQueryInsertar($consulta, $idPedido, $item);
+            $item->idPedido = intval($idPedido);
+            self::EjecutarQueryInsertar($consulta, $item, $idPedido);
         }
     }
 
     private static function BindColumns($consulta) {
         $aux = new stdClass();
         $consulta->bindColumn('id', $aux->id, PDO::PARAM_INT);
+        $consulta->bindColumn('idPedido', $aux->idPedido, PDO::PARAM_INT);
         $consulta->bindColumn('idProducto', $aux->idProducto, PDO::PARAM_INT);
         $consulta->bindColumn('producto', $aux->producto, PDO::PARAM_STR);
         $consulta->bindColumn('precioUnitario', $aux->precioUnitario, PDO::PARAM_STR);//parsear a float
@@ -125,7 +156,7 @@ class ItemPedido implements JsonSerializable
         $items = [];
         while ($fila = $consulta->fetch(PDO::FETCH_BOUND)) {
             //var_dump($aux);
-            $item = new ItemPedido($aux->idProducto, $aux->producto, $aux->precioUnitario, $aux->idTipoProducto, $aux->idEstado, $aux->estado, $aux->idEmpleado, $aux->tiempoEstimado, $aux->horaFinalizado, $aux->puntaje, $aux->id);
+            $item = new ItemPedido($aux->idProducto, $aux->producto, $aux->precioUnitario, $aux->idTipoProducto, $aux->idEstado, $aux->estado, $aux->idPedido, $aux->idEmpleado, $aux->tiempoEstimado, $aux->horaFinalizado, $aux->puntaje, $aux->id);
             array_push($items, $item);
         }
 
@@ -138,7 +169,7 @@ class ItemPedido implements JsonSerializable
 
         $item = null;
         if ($consulta->fetch(PDO::FETCH_BOUND)) {
-            $item = new ItemPedido($aux->idProducto, $aux->producto, $aux->precioUnitario, $aux->idTipoProducto, $aux->idEstado, $aux->estado, $aux->idEmpleado, $aux->tiempoEstimado, $aux->horaFinalizado, $aux->puntaje, $aux->id);
+            $item = new ItemPedido($aux->idProducto, $aux->producto, $aux->precioUnitario, $aux->idTipoProducto, $aux->idEstado, $aux->estado, $aux->idPedido, $aux->idEmpleado, $aux->tiempoEstimado, $aux->horaFinalizado, $aux->puntaje, $aux->id);
         }
 
         return $item;
@@ -188,7 +219,7 @@ class ItemPedido implements JsonSerializable
         $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
         $query = 'SELECT i.*, p.nombre AS producto, p.idTipoProducto AS idTipoProducto, e.estado AS nombreEstado FROM itemsPedido i LEFT JOIN productos p 
         ON i.idProducto = p.id LEFT JOIN estadosPedido e ON i.idEstado = e.id 
-        WHERE p.idTipoProducto = :idTipoProducto AND i.idEstado = :idEstado';
+        WHERE p.idTipoProducto = :idTipoProducto AND i.idEstado = :idEstado ORDER BY i.idPedido ASC';
         
         $consulta = $objetoAccesoDato->RetornarConsulta($query);
         $consulta->bindValue(':idTipoProducto', $idTipoProducto, PDO::PARAM_INT);
@@ -212,7 +243,7 @@ class ItemPedido implements JsonSerializable
     }
 
     //ver si usar o enviar directamente el idProducto desde el postman
-    public static function ConvertirAArrayItems(array $data = []) {
+    public static function ConvertirAArrayItems(array $data = [], $idPedido = null) {
         $item = null;
         $items = [];
         $producto = null;
@@ -231,11 +262,11 @@ class ItemPedido implements JsonSerializable
             if (isset($i['cantidad'])) {
                 $cantidad = intval($i['cantidad']);
                 for ($i=1; $i <= $cantidad; $i++) { 
-                    $item = new ItemPedido($producto->id, $producto->nombre, $producto->precio, $producto->idTipoProducto, $idEstado, $estado, $idEmpleado, $id);
+                    $item = new ItemPedido($producto->id, $producto->nombre, $producto->precio, $producto->idTipoProducto, $idEstado, $estado, $idPedido, $idEmpleado, $id);
                     array_push($items, $item);
                 }
             } else {
-                $item = new ItemPedido($producto->id, $producto->nombre, $producto->precio, $producto->idTipoProducto, $idEstado, $estado, $idEmpleado, $id);
+                $item = new ItemPedido($producto->id, $producto->nombre, $producto->precio, $producto->idTipoProducto, $idEstado, $estado, $idPedido, $idEmpleado, $id);
                 array_push($items, $item);
             }
 
@@ -257,6 +288,19 @@ class ItemPedido implements JsonSerializable
         $consulta->bindColumn('resultado', $resultado, PDO::PARAM_BOOL);
         $consulta->fetch(PDO::FETCH_BOUND);
         return $resultado;
+    }
+
+    public static function ControlarSiItemPerteneceAlItem($idItem, $idPedido) {
+        $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
+        $query = 'SELECT i.*, p.nombre AS producto, p.idTipoProducto AS idTipoProducto, e.estado AS nombreEstado FROM itemsPedido i LEFT JOIN productos p 
+        ON i.idProducto = p.id LEFT JOIN estadosPedido e ON i.idEstado = e.id WHERE i.id = :idItem AND i.idPedido = :idPedido';
+        
+        $consulta = $objetoAccesoDato->RetornarConsulta($query);
+        $consulta->bindValue(':idItem', $idItem, PDO::PARAM_INT);
+        $consulta->bindValue(':idPedido', $idPedido, PDO::PARAM_INT);
+        $consulta->execute();
+
+        return self::FetchQueryGet($consulta);
     }
 
     public static function EliminarItems($idPedido)
@@ -311,8 +355,10 @@ class ItemPedido implements JsonSerializable
     public function jsonSerialize(){
         return [
             'id' => $this->id,
+            'idPedido' => $this->idPedido,
             'idProducto' => $this->idProducto,
             'producto' => $this->producto,
+            'idTipoProducto' => $this->idTipoProducto,
             'precioUnitario' => $this->precioUnitario,
             'estado' => $this->estado,
             'idEmpleado' => $this->idEmpleado

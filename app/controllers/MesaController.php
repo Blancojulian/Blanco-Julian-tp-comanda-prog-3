@@ -6,6 +6,7 @@ require_once './models/Pedido.php';
 require_once './utils/utils.php';
 require_once './interfaces/IController.php';
 require_once './enums/EEstadosMesa.php';
+require_once './utils/BaseRespuestaError.php';
 
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Psr\Http\Message\ResponseInterface as Response;
@@ -13,7 +14,7 @@ use Slim\Exception\HttpException;
 use Slim\Exception\HttpBadRequestException;
 use Slim\Exception\HttpNotFoundException;
 
-class MesaController implements IController {
+class MesaController extends BaseRespuestaError implements IController {
 
 
     public function Get(Request $req, Response $res, array $args = []) {
@@ -126,9 +127,11 @@ class MesaController implements IController {
 
     //el mozo ingresa el id del Pedido listo para servir y lo lleva a la mesa
     //cambia el estadode la mesa 
-    public function ServirMesa(Request $req, Response $res, array $args = []) {
+    //ahora va ser desde pedidoController porque cambia el pedido y tiene mas sentido porque paso el id del pedido
+    /*public function ServirMesa(Request $req, Response $res, array $args = []) {
         $mesaClienteComiendo = 2;
         $idEstadoListoParaServir = 3;
+        $mesaClienteComiendo = 2;
         //$idMesa = intval($args['id']);
         $idPedido = intval($args['id']);
 
@@ -143,20 +146,24 @@ class MesaController implements IController {
         if (!isset($mesa)) {
             return self::RespuestaError(404, 'Mesa no existe');
         }
+        if ($mesa->idEstado == $mesaClienteComiendo) {
+            return self::RespuestaError(400, 'Mesa ya servida');
+        }
         $mesa->idEstado = $mesaClienteComiendo;
         $mesa->ModificarMesa();
         $payload = json_encode(['mensaje' => "Mesa servida"]);
         $res->getBody()->write($payload);
 
         return $res;
-    }
+    }*/
     //el mozo directamente va a cobrar la cuenta, validar que el estado de la mesa sea con cliente comiendo
     //no esta terminado
     public function CobrarMesa(Request $req, Response $res, array $args = []) {
         $mesaClienteComiendo = 2;
         $mesaClientePagando = 3;
+        $mesaCerrada = 4;
         $idMesa = intval($args['id']);
-        $mesa = Mesa::GetMesaPorCodigo($idMesa);
+        $mesa = Mesa::GetMesa($idMesa);
         if (!isset($mesa)) {
             return self::RespuestaError(404, 'Mesa no existe');
         }
@@ -164,6 +171,11 @@ class MesaController implements IController {
         if ($mesa->idEstado < $mesaClienteComiendo) {
             return self::RespuestaError(400, 'A la mesa no se sirvio el pedido');
         }
+
+        if ($mesa->idEstado == $mesaCerrada) {
+            return self::RespuestaError(400, 'La mesa esta cerrada');
+        }
+
         if ($mesa->idEstado == $mesaClientePagando) {
             return self::RespuestaError(400, 'Mesa ya cobrada');
         }
@@ -181,14 +193,14 @@ class MesaController implements IController {
         $mesaClientePagando = 3;
         $mesaCerrada = 4;
         $idMesa = intval($args['id']);
-        $mesa = Mesa::GetMesaPorCodigo($idMesa);
+        $mesa = Mesa::GetMesa($idMesa);
         if (!isset($mesa)) {
             return self::RespuestaError(404, 'Mesa no existe');
         }
-        
+        /*
         if ($mesa->idEstado < $mesaClientePagando) {
             return self::RespuestaError(400, 'Mesa con cliente');
-        }
+        }*/
         
         $mesa->idEstado = $mesaCerrada;
         $mesa->ModificarMesa();
@@ -199,14 +211,13 @@ class MesaController implements IController {
     }
     
     public function GetMesaMasUsada(Request $req, Response $res, array $args = []) {
-        $parametros = $req->getQueryParams();
+        //$parametros = $req->getQueryParams();
         $datos = null;
         $mensaje = ['mensaje' => "No hay mesas usadas"];
-        if (!isset($parametros['codigoMesa']) || EsVacioONuloOEnBlanco($parametros['codigoMesa'])) {
+        /*if (!isset($parametros['codigoMesa']) || EsVacioONuloOEnBlanco($parametros['codigoMesa'])) {
             return self::RespuestaError(400, 'Debe enviar codigo de mesa');
-        }
-        $consulta = Pedido::GetCodigoMesaConMasPedidos($parametros['codigoMesa']);
-
+        }*/
+        $consulta = Pedido::GetMesaConMasPedidos();//$parametros['codigoMesa']);
         if (isset($consulta)) {
             $mensaje = $consulta;
         }
@@ -216,6 +227,40 @@ class MesaController implements IController {
 
         return $res;
     }
+
+    public function GetMesaTotalFacturadoPorFechas(Request $req, Response $res, array $args = []) {
+        $parametros = $req->getQueryParams();
+        $datos = null;
+        $mensaje = ['mensaje' => "No se uso la mesa"];
+        if (!isset($parametros['idMesa']) || !isset($parametros['fechaDesde']) || !isset($parametros['fechaHasta'])) {
+            return self::RespuestaError(400, 'Debe enviar codigo de mesa');
+        }
+
+        if (!EsFechaValida($parametros['fechaDesde']) || !EsFechaValida($parametros['fechaHasta'])) {
+            return self::RespuestaError(400, 'Fecha invalida, debe ser AAAA/MM/DD');
+        }
+        $idMesa = intval($parametros['idMesa']);
+        $mesa = Mesa::GetMesa($idMesa);
+        if (!isset($mesa)) {
+            return self::RespuestaError(404, 'Mesa no existe');   
+        }
+        $consulta = Mesa::GetMesaTotalFacturadoPorFechas($idMesa, $parametros['fechaDesde'], $parametros['fechaHasta']);//$parametros['codigoMesa']);
+        if (isset($consulta)) {
+            $mensaje = ['facturado' => $consulta, 'fechaDesde' => $parametros['fechaDesde'], 'fechaHasta' => $parametros['fechaHasta']];
+        }
+
+        $payload = json_encode($mensaje);
+        $res->getBody()->write($payload);
+
+        return $res;
+    }
+
+    public function GetMesasSegunFacturaMasAlta(Request $req, Response $res, array $args = []) {
+        $mesas = Mesa::GetMesasSegunFacturacion();
+        $res->getBody()->write(json_encode($mesas));
+        return $res;
+    }
 }
+
 
 ?>

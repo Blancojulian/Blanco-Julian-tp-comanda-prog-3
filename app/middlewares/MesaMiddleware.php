@@ -1,5 +1,7 @@
 <?php
 
+require_once './utils/BaseRespuestaError.php';
+
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Psr\Http\Server\RequestHandlerInterface as RequestHandler;
 use Slim\Psr7\Response;
@@ -8,7 +10,7 @@ use Slim\Exception\HttpException;
 use Slim\Exception\HttpBadRequestException;
 use Slim\Exception\HttpNotFoundException;
 
-class MesaMiddleware
+class MesaMiddleware extends BaseRespuestaError
 {
     /**
      * Example middleware invokable class
@@ -23,14 +25,6 @@ class MesaMiddleware
         return $this->ControlarParametros($request, $handler);
     }
 
-    private static function RespuestaError($codigo = 400, $error = 'Faltan parametros') {
-        $response = new Response();
-        $payload = json_encode(['error' => $error]);
-        $response->getBody()->write($payload);
-        $response = $response->withStatus($codigo);
-        $response = $response->withHeader('Content-Type', 'application/json');
-        return $response;
-    }
     //$routeArguments = \Slim\Routing\RouteContext::fromRequest($request)->getRoute()->getArguments();
     //https://www.slimframework.com/docs/v4/objects/request.html#route-object
     //recuperar args

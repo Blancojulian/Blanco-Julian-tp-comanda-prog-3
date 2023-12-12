@@ -1,5 +1,9 @@
 <?php
 
+require_once './enums/EEstadosPedido.php';
+require_once './utils/utils.php';
+require_once './utils/BaseRespuestaError.php';
+
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Psr\Http\Server\RequestHandlerInterface as RequestHandler;
 use Slim\Psr7\Response;
@@ -8,7 +12,7 @@ use Slim\Exception\HttpException;
 use Slim\Exception\HttpBadRequestException;
 use Slim\Exception\HttpNotFoundException;
 
-class EstadoItemMiddleware
+class EstadoItemMiddleware extends BaseRespuestaError
 {
     private $_rolEmpleado;
     private $_idEstado;
@@ -35,15 +39,6 @@ class EstadoItemMiddleware
         }
         $response = $handler->handle($request);
 
-        return $response;
-    }
-
-    private static function RespuestaError($codigo = 400, $error = 'Faltan parametros') {
-        $response = new Response();
-        $payload = json_encode(['error' => $error]);
-        $response->getBody()->write($payload);
-        $response = $response->withStatus($codigo);
-        $response = $response->withHeader('Content-Type', 'application/json');
         return $response;
     }
     
@@ -78,10 +73,8 @@ class EstadoItemMiddleware
     */
     //validar que cuando se cambie a listo para servir sea el mismo empleado que acepto encargarse del item
     private function ControlarCambioEstadoItem(Request $request, int $idEstado) {
-        $idEstadoPendiente = 1;
-        $idEstadoEnPreparacion = 2;
-        $idEstadoListoParaServir = 3;
-        if ($idEstado !== $idEstadoEnPreparacion && $idEstado !== $idEstadoListoParaServir) {
+
+        if ($idEstado !== EstadosPedido::EnPreparacion->value && $idEstado !== EstadosPedido::ListoParaServir->value) {
             throw new Exception('Solamente se puede cambiar el estado a en preparacion o listo para servir');
         }
         $parametros = $request->getParsedBody();
@@ -101,41 +94,36 @@ class EstadoItemMiddleware
         $rolEmpleado = $data->rol;
         $idEmpleado = $data->id;
 
-        if (!isset($parametros['idPedido']) || !is_array($parametros['items']) || count($parametros['items']) <= 0) {
-            throw new Exception('Debe enviar los items, minutos estimados y Id del pedido');
-        }
-
-        $pedido = Pedido::GetPedido(intval($parametros['idPedido']));
-
-        if (!isset($pedido)) {
-            throw new Exception('No existe el pedido');
+        if (!isset($parametros['items']) || !is_array($parametros['items']) || count($parametros['items']) <= 0) {
+            throw new Exception('Debe enviar los items y minutos estimados');
         }
         
-        if ($pedido->idEstado >= $idEstadoListoParaServir) {
-            throw new Exception('El pedido ya se encuentra listo para servir');
-        }
-        $esEnPreparacion = $idEstado == $idEstadoEnPreparacion;//si se esta por terminar el item, no va tener minutosEstimados
+        //ahora el item tiene el id del pedido, ya no se va a enviar el idPedido
+
+        $esEnPreparacion = $idEstado == EstadosPedido::EnPreparacion->value;//si se esta por terminar el item, no va tener minutosEstimados
 
         foreach($parametros['items'] as $i) {
             if (!isset($i['idItem']) || ($esEnPreparacion && !isset($i['minutosEstimados']))) {
                 throw new Exception('En los items debe enviar el id item y minutos estimados');
             }
-            if ($esEnPreparacion && (!is_numeric($i['minutosEstimados']) || str_contains($i['minutosEstimados'], '.'))) {
+            if ($esEnPreparacion && !EsNumeroEntero($i['minutosEstimados']) ) {
                 throw new Exception('Los minutos estimados debe ser un numero entero, id item: ' . $i['idItem']);
             }
             $item = ItemPedido::GetItem(intval($i['idItem']));
-            $this->ControlarEncargadoDelItem($item->idTipoProducto, $rolEmpleado);
-
             if (!isset($item)) {
                 array_push($listaIdsNoExisten, $i['idItem']);
-            } else if ($idEstado == $idEstadoListoParaServir && $item->idEstado == $idEstadoPendiente) {//si se quiere pasar de estado pendiente a listo
+                continue;
+            }
+            $this->ControlarEncargadoDelItem($item->idTipoProducto, $rolEmpleado);
+
+            if ($idEstado == EstadosPedido::ListoParaServir->value && $item->idEstado == EstadosPedido::Pendiente->value) {//si se quiere pasar de estado pendiente a listo
                 array_push($listaIdsPendiente, $item->id);
-            } else if ($idEstado == $idEstadoEnPreparacion && $item->idEstado == $idEstadoEnPreparacion) {//si ya se encuentra en preparacion
+            } else if ($idEstado == EstadosPedido::EnPreparacion->value && $item->idEstado == EstadosPedido::EnPreparacion->value) {//si ya se encuentra en preparacion
                 array_push($listaIdsEnPreparacion, $item->id);
-            } else if ($item->idEstado >= $idEstadoListoParaServir) {//si el item ya esta listo
+            } else if ($item->idEstado >= EstadosPedido::ListoParaServir->value) {//si el item ya esta listo
                 array_push($listaIdsListoParaServir, $item->id);
-            } else if (($idEstado === $idEstadoListoParaServir && isset($item->idEmpleado) && $idEmpleado != $item->idEmpleado) ||
-            ($idEstado === $idEstadoEnPreparacion && isset($item->idEmpleado)) ) {//si otro empleado se encarga del item o si se quiere servir pero otro se encarga 
+            } else if (($idEstado === EstadosPedido::ListoParaServir->value && isset($item->idEmpleado) && $idEmpleado != $item->idEmpleado) ||
+            ($idEstado === EstadosPedido::EnPreparacion->value && isset($item->idEmpleado)) ) {//si otro empleado se encarga del item o si se quiere servir pero otro se encarga 
                 array_push($listaIdsItemYaEncargado, $item->id);
             }
         }

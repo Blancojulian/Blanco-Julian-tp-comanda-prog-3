@@ -2,6 +2,7 @@
 
 require_once './utils/AutentificadorJWT.php';
 require_once './models/Pedido.php';
+require_once './models/Encuesta.php';
 require_once './models/EstadoPedido.php';
 require_once './models/ItemPedido.php';
 require_once './models/Mesa.php';
@@ -55,7 +56,7 @@ class PedidoController extends BaseRespuestaError implements IController {
         $idTipoBebida = 1;
         $idEstadoPendiente = 1;
         $pedidos = ItemPedido::GetItemsPorTipoProducto($idTipoBebida, $idEstadoPendiente);
-        $payload = json_encode(["pedidos" => $pedidos]);
+        $payload = json_encode(["items pedidos" => $pedidos]);
         $res->getBody()->write($payload);
 
         return $res; 
@@ -66,7 +67,7 @@ class PedidoController extends BaseRespuestaError implements IController {
         $idTipoComida = 2;
         $idEstadoPendiente = 1;
         $pedidos = ItemPedido::GetItemsPorTipoProducto($idTipoComida, $idEstadoPendiente);
-        $payload = json_encode(["pedidos" => $pedidos]);
+        $payload = json_encode(["items pedidos" => $pedidos]);
         $res->getBody()->write($payload);
 
         return $res; 
@@ -77,7 +78,7 @@ class PedidoController extends BaseRespuestaError implements IController {
         $idTipoCerveza = 3;
         $idEstadoPendiente = 1;
         $pedidos = ItemPedido::GetItemsPorTipoProducto($idTipoCerveza, $idEstadoPendiente);
-        $payload = json_encode(["pedidos" => $pedidos]);
+        $payload = json_encode(["items pedidos" => $pedidos]);
         $res->getBody()->write($payload);
 
         return $res; 
@@ -90,6 +91,13 @@ class PedidoController extends BaseRespuestaError implements IController {
         $res->getBody()->write($payload);
         
         return $res; 
+    }
+
+    public function GetPedidosListos(Request $req, Response $res, array $args = []) {
+        
+        $pedidos = Pedido::GetPedidosListosParaServir();
+        $res->getBody()->write(json_encode($pedidos));
+        return $res;
     }
 
     public function GetAllPorCriterio(Request $req, Response $res, array $args = []) {
@@ -127,8 +135,8 @@ class PedidoController extends BaseRespuestaError implements IController {
 
         $mesa = Mesa::GetMesaPorCodigo($parametros['codigoMesa']);
         
-        $pedido = new Pedido($codigo, $parametros['nombreCliente'],
-        $parametros['codigoMesa'], $estado->id, $estado->estado, $idMozo);
+        $pedido = new Pedido($codigo, $parametros['nombreCliente'], $mesa->id, 
+        $mesa->codigo, $estado->id, $estado->estado, $idMozo);
         $pedido->items = $itemsParseados;
         $pedido->CalcularTotal();
         $id = $pedido->CrearPedido();
@@ -152,8 +160,7 @@ class PedidoController extends BaseRespuestaError implements IController {
         if (!isset($pedido)) {
             throw new HttpNotFoundException($req, 'Pedido no existe');   
         }
-        $pedido->cancelado = true;
-        $pedido->ModificarPedido();
+        Pedido::CancelarPedido($pedido->id);
         $payload = json_encode(['mensaje' => "Pedido cancelado"]);
         $res->getBody()->write($payload);
         return $res; 
@@ -180,7 +187,7 @@ class PedidoController extends BaseRespuestaError implements IController {
         $pedido->idEstado = $estado->id;
         $pedido->estado = $estado->estado;
         if (isset($parametros['items'])) {
-            $itemsParseados = ItemPedido::ConvertirAArrayItems($parametros['items']);
+            $itemsParseados = ItemPedido::ConvertirAArrayItems($parametros['items'], $pedido->id);
             $pedido->items = $itemsParseados;
             $pedido->CalcularTotal();
             ItemPedido::EliminarItems($pedido->id);
@@ -189,16 +196,7 @@ class PedidoController extends BaseRespuestaError implements IController {
 
         $pedido->ModificarPedido();
         
-        $pedido = new Pedido($codigo, $parametros['nombreCliente'],
-        $parametros['codigoMesa'], $estado->id, $estado->estado);
-
-        $pedido->items = $itemsParseados;
-        $pedido->CalcularTotal();
-        $id = $pedido->CrearPedido();
-        //cambiar mesa a cliente esperando
-        $mesa->idEstado = $mesaClienteEsperando;
-        $mesa->ModificarMesa();
-        $payload = json_encode(['mensaje' => "Pedido creado", 'id' => $id, 'codigo' => $codigo]);
+        $payload = json_encode(['mensaje' => "Pedido modificado", 'id' => $id, 'codigo' => $codigo]);
         $res->getBody()->write($payload);
 
         return $res;
@@ -213,7 +211,7 @@ class PedidoController extends BaseRespuestaError implements IController {
         }
         $uploadedFiles = $req->getUploadedFiles();
         $uploadedFile = $uploadedFiles['imagen'];
-        $filename = FormatearNumero($pedido->id) . "$pedido->codigo-$pedido->codigoMesa.jpg";
+        $filename = FormatearNumero($pedido->id) . "-$pedido->codigo-$pedido->codigoMesa.jpg";
         moveUploadedFile($this->_carpetaPedidos, $filename, $uploadedFile);
         $pedido->imagen = "$filename.jpg";
         $pedido->ModificarPedido();
@@ -235,6 +233,10 @@ class PedidoController extends BaseRespuestaError implements IController {
         return $data;
     }
     //este hay que pasar a un controller EstadoItem o hacer AtenderItems y TerminarItems
+    //ahora conculto el el pedido desde idPedido del item
+    //asi se puede preparar items de distintos pedidos
+    //ItemPedido::MofidicarItem(intval($parametros['idPedido']), $item);
+    //cambiar esta linea: ItemPedido::MofidicarItem(intval($parametros['idPedido']), $item);
     public function AtenderItems(Request $req, Response $res, array $args = []) {
         $parametros = $req->getParsedBody();
         $data = $this->GetDataFromRequest($req);//ver si esta bien hacer esto, o si tendria que mandar el idEmpleado por parametro
@@ -242,12 +244,12 @@ class PedidoController extends BaseRespuestaError implements IController {
         $item = null;
         $minutos = null;
         $horaEstimada = null;
-        $horaMaxima = null;
         $idEstadoEnPreparacion = 2;
 
         foreach ($parametros["items"] as $i) {
 
             $item = ItemPedido::GetItem(intval($i['idItem']));
+            $pedido = Pedido::GetPedido($item->idPedido);
 
             $minutos = $i['minutosEstimados'];
             $horaEstimada = new DateTime();
@@ -255,21 +257,18 @@ class PedidoController extends BaseRespuestaError implements IController {
             $item->tiempoEstimado = $horaEstimada;
             $item->idEstado = $idEstadoEnPreparacion;
             $item->idEmpleado = $data->id;
-            if ($horaMaxima == null || $horaEstimada > $horaMaxima) {
-                $horaMaxima = $horaEstimada;
+
+            //ItemPedido::MofidicarItem(intval($parametros['idPedido']), $item);
+            $item->MofidicarItem();
+            $pedido->idEstado = $idEstadoEnPreparacion;
+
+            if (!isset($pedido->tiempoEstimado) || $horaEstimada > $pedido->tiempoEstimado) {
+                $pedido->tiempoEstimado = $horaEstimada;
             }
 
-            ItemPedido::MofidicarItem(intval($parametros['idPedido']), $item);
+            $pedido->ModificarPedido();
         }
         
-        $pedido = Pedido::GetPedido(intval($parametros['idPedido']));
-        $pedido->idEstado = $idEstadoEnPreparacion;
-
-        if (!isset($pedido->tiempoEstimado) || $horaMaxima > $pedido->tiempoEstimado) {
-            $pedido->tiempoEstimado = $horaMaxima;
-        }
-
-        $pedido->ModificarPedido();
         $payload = json_encode(['mensaje' => "Se estan preparando los items"]);
         $res->getBody()->write($payload);
 
@@ -290,17 +289,19 @@ class PedidoController extends BaseRespuestaError implements IController {
         foreach ($parametros["items"] as $i) {
 
             $item = ItemPedido::GetItem(intval($i['idItem']));
+            //$pedido = Pedido::GetPedido($item->idPedido);
 
             $item->horaFinalizado = $horaFinalizado;
             $item->idEstado = $idEstadoListoParaServir;
+            $item->MofidicarItem();
 
-            ItemPedido::MofidicarItem(intval($parametros['idPedido']), $item);
-
+            //ItemPedido::MofidicarItem(intval($parametros['idPedido']), $item);
+            $estaListoPedido = self::TerminarPedido($item->idPedido, $horaFinalizado);
         }
         
-        $pedido = Pedido::GetPedido(intval($parametros['idPedido']));
+        //$pedido = Pedido::GetPedido(intval($parametros['idPedido']));
         
-        $estaListoPedido = self::TerminarPedido($pedido->id, $horaFinalizado);
+        //$estaListoPedido = self::TerminarPedido($pedido->id, $horaFinalizado);
         
         $payload = json_encode(['mensaje' => "Se terminaron los item"]);
         $res->getBody()->write($payload);
@@ -332,16 +333,14 @@ class PedidoController extends BaseRespuestaError implements IController {
     public function PuntuarPedido(Request $req, Response $res, array $args = []) {
         $parametros = $req->getParsedBody();
         $arrayPuntajeItems = $parametros['puntajeItems'];
-        var_dump($arrayPuntajeItems);
         $pedido = Pedido::GetPedidoPorCodigo($parametros['codigoPedido']);
         //if (!isset($parametros['codigoPedido']) || !isset($parametros['codigoMesa']) || !isset($parametros['resenia']) || !isset($parametros['puntajeMesa']) || !isset($parametros['puntajeMozo']) || 
         //!isset($parametros['puntajeItems']) || !is_array($parametros['puntajeItems']) || count($parametros['puntajeItems']) <= 0) {
-        
-        $pedido->resenia = $parametros['resenia'];
-        $pedido->puntajeMozo = intval($parametros['puntajeMozo']);
-        $pedido->puntajeMesa = intval($parametros['puntajeMesa']);
-        $pedido->puntajeMesa = intval($parametros['puntajeRestaurante']);
-        $pedido->ModificarPedido();
+
+        //($idPedido, $resenia, $puntajeRestaurante, $puntajeMozo, $puntajeMesa, $fechaAlta = null, $fechaModificacion = null, $fechaCancelacion = null, $id = null, $items = []) {
+        $encuesta = new Encuesta($pedido->id, $parametros['resenia'], intval($parametros['puntajeRestaurante']), 
+        intval($parametros['puntajeMozo']), intval($parametros['puntajeMesa']));
+        $encuesta->CrearEncuesta();
 
         $index = null;
         foreach ($pedido->items as $item) {
@@ -371,24 +370,33 @@ class PedidoController extends BaseRespuestaError implements IController {
             return self::RespuestaError(404, 'Pedido no encontrado');
         }
         $ahora = new DateTime();
-        $estado = $ahora > $pedido->tiempoEstimado ? 'atrasado' : 'En preparación';
-        $payload = json_encode([
-            'horaEstimada' => $pedido->tiempoEstimado,
-            'tiempoRestante'=> CalcularTiempoRestante($pedido->tiempoEstimado),
-            'estado' => $estado
-        ]);
+        $payload = null;
+        if (isset($pedido->horaEntrega)) {
+            $payload = json_encode(['mensaje' => 'Ya se entrego el pedido']);
+        } else if ($pedido->tiempoEstimado instanceof DateTime) {
+            $estaAtrasado = $ahora > $pedido->tiempoEstimado;
+            $estado = $estaAtrasado ? 'atrasado' : 'En preparación';
+            $signo = $estaAtrasado ? '- ' : '';
+            $payload = json_encode([
+                'horaEstimada' => $pedido->GetTiempoEstimado(),
+                'tiempoRestante'=> $signo . CalcularTiempoRestante($pedido->tiempoEstimado),
+                'estado' => $estado
+            ]);
+        } else {
+            $payload = json_encode(['mensaje' => 'No se esta preparando el pedido']);
+        }
         $res->getBody()->write($payload);
 
         return $res;
     }
-    
+    /*
     public function GetMejoresComentarios(Request $req, Response $res, array $args = []) {
         $resenias = Pedido::GetPedidosPorPuntaje(7);
         $payload = json_encode($resenias);
         $res->getBody()->write($payload);
 
         return $res;
-    }
+    }*/
     
 
     public function GetPedidosPorEntrega(Request $req, Response $res, array $args = []) {
@@ -401,6 +409,40 @@ class PedidoController extends BaseRespuestaError implements IController {
         $fueraDeTiempo = $parametros['filtro'] == 'fueraDeTiempo';
         $pedidos = Pedido::GetPedidosPorEntrega($fueraDeTiempo);
         $payload = json_encode($pedidos);
+        $res->getBody()->write($payload);
+
+        return $res;
+    }
+
+    public function ServirPedido(Request $req, Response $res, array $args = []) {
+        $mesaClienteComiendo = 2;
+        $idEstadoListoParaServir = 3;
+        $mesaClienteComiendo = 2;
+        //$idMesa = intval($args['id']);
+        $idPedido = intval($args['id']);
+
+        $pedido = Pedido::GetPedido($idPedido);
+        if (!isset($pedido)) {
+            return self::RespuestaError(404, 'Pedido no existe');
+        }
+        if ($pedido->idEstado !== $idEstadoListoParaServir) {
+            return self::RespuestaError(400, 'Pedido no terminado');
+        }
+        if (isset($pedido->horaEntrega)) {
+            return self::RespuestaError(400, 'Pedido ya entregado');
+        }
+        $mesa = Mesa::GetMesa($pedido->idMesa);
+        if (!isset($mesa)) {
+            return self::RespuestaError(404, 'Mesa no existe');
+        }
+        if ($mesa->idEstado == $mesaClienteComiendo) {
+            return self::RespuestaError(400, 'Mesa ya servida');
+        }
+        $pedido->horaEntrega = new DateTime();
+        $pedido->ModificarPedido();
+        $mesa->idEstado = $mesaClienteComiendo;
+        $mesa->ModificarMesa();
+        $payload = json_encode(['mensaje' => "Pedido servido"]);
         $res->getBody()->write($payload);
 
         return $res;

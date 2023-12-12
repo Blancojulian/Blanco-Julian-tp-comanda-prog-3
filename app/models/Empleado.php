@@ -18,7 +18,7 @@ class Empleado implements JsonSerializable
     public $fechaSuspension;
     private $contrasenia;
     
-    public function __construct($nombre, $apellido, $dni, $email, $idPuesto, $puesto, $contrasenia, $fechaSuspension, $fechaAlta = null, $fechaModificacion = null, $fechaBaja = null, $id = null) {
+    public function __construct($nombre, $apellido, $dni, $email, $idPuesto, $puesto, $contrasenia, $fechaSuspension = null, $fechaAlta = null, $fechaModificacion = null, $fechaBaja = null, $id = null) {
         $this->id = $id;
         $this->nombre = $nombre;
         $this->apellido = $apellido;
@@ -197,8 +197,8 @@ class Empleado implements JsonSerializable
         return $fechaBaja;
     }
 
-    public static function SuspenderEmpleado($id) {
-        $fechaSuspension = date('Y/m/d H:i:s',strtotime("now"));
+    public static function SuspenderEmpleado($id, $suspender = true) {
+        $fechaSuspension = $suspender ? date('Y/m/d H:i:s',strtotime("now")) : null;
         $objetoAccesoDato = AccesoDatos::getObjetoAcceso();
         $query = 'UPDATE empleados SET fechaSuspension = :fechaSuspension WHERE id = :id';
 
