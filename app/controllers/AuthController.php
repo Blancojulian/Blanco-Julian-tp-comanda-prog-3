@@ -25,6 +25,9 @@ class AuthController extends BaseRespuestaError {
         if (!isset($empleado)) {
             return self::RespuestaError(401, 'Email o contraseña incorrecto'); 
         }
+        if (isset($empleado->fechaSuspension)) {
+            return self::RespuestaError(401, 'Empleado suspendido'); 
+        }
 
         $datos = [
             'rol' => $empleado->puesto,
